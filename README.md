@@ -1,36 +1,182 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Team OS Dashboard
 
-## Getting Started
+A modern, responsive dashboard for EdTech startups built with Next.js 14, TypeScript, Tailwind CSS, and Recharts.
 
-First, run the development server:
+![Team OS Dashboard](https://img.shields.io/badge/Next.js-14-black) ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-38bdf8)
+
+## 🚀 Features
+
+- **📊 Dashboard Home** - Budget metrics, active tasks, and launch countdown
+- **📦 Inventory System** - Equipment tracking with status badges and budget monitoring
+- **✅ Task Manager** - Kanban board with team filtering and priority indicators
+- **📅 Timeline** - Project roadmap with milestone tracking
+- **💰 Budget Calculator** - Expense visualization and break-even analysis
+
+## 🎯 Quick Start
 
 ```bash
+# Install dependencies
+npm install
+
+# Run development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Open http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📁 Project Structure
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+team-os-dashboard/
+├── app/              # Next.js pages with App Router
+│   ├── page.tsx      # Dashboard home
+│   ├── inventory/    # Equipment tracking
+│   ├── tasks/        # Kanban board
+│   ├── timeline/     # Project roadmap
+│   └── budget/       # Financial overview
+├── components/       # Reusable UI components
+├── lib/
+│   └── store.ts      # Central data store (edit this!)
+└── package.json
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🎨 Customizing Data
 
-## Learn More
+All data is stored in **`lib/store.ts`** with clear TypeScript interfaces and comments.
 
-To learn more about Next.js, take a look at the following resources:
+### Edit Equipment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```typescript
+export const equipment: Equipment[] = [
+  {
+    id: "1",
+    name: "Sony FX30 Camera",
+    category: "Camera",
+    price: 1799,
+    status: "Received", // "To Buy" | "Ordered" | "Received"
+    owner: "Ahmed Hassan",
+  },
+  // Add more items...
+];
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Edit Tasks
 
-## Deploy on Vercel
+```typescript
+export const tasks: Task[] = [
+  {
+    id: "1",
+    title: "Record Lesson 6",
+    description: "Record the advanced functions module",
+    status: "To Do", // "To Do" | "In Progress" | "Done"
+    assignee: "1", // Team member ID
+    priority: "High", // "High" | "Medium" | "Low"
+  },
+];
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Edit Budget
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```typescript
+export const budget: Budget = {
+  totalBudget: 15000,
+  oneTimeCosts: [
+    { category: "Cameras & Lenses", amount: 2537 },
+    // Add more categories...
+  ],
+  monthlyCosts: [
+    { category: "Electricity", amount: 150 },
+    // Add more costs...
+  ],
+  revenuePerStudent: 49.99, // Monthly subscription price
+};
+```
+
+## 📱 Responsive Design
+
+- **Desktop (≥1024px)**: Fixed sidebar navigation
+- **Tablet/Mobile (<1024px)**: Bottom navigation bar
+- All components are fully responsive
+
+## 🛠️ Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
+- **Charts**: Recharts
+- **Utilities**: clsx, tailwind-merge
+
+## 📦 Included Sample Data
+
+The dashboard comes pre-populated with realistic EdTech studio data:
+
+- **Equipment**: Sony FX30, Sigma lenses, Rode microphones, Aputure lighting, Montage PC
+- **Tasks**: Recording lessons, editing videos, marketing activities
+- **Team Members**: Content creator, editor, marketer, operations manager
+- **Budget**: $15,000 total with detailed breakdown
+- **Timeline**: 3 project phases from studio setup to launch
+
+## 🎨 Design System
+
+- **Primary Color**: Emerald/Teal (#10b981)
+- **Font**: Inter (Google Fonts)
+- **Card Style**: White with subtle shadows and rounded corners
+- **Badges**: Color-coded by status (Gray/Yellow/Green for inventory, Red/Yellow/Green for priority)
+
+## 📊 Pages Overview
+
+### Dashboard (/)
+- Budget spent vs. remaining
+- Active tasks counter
+- Days until launch
+- Quick action buttons
+- Project status progress bars
+
+### Inventory (/inventory)
+- Equipment table with filtering
+- Budget usage tracking
+- Status badges (To Buy, Ordered, Received)
+- Price summaries
+
+### Tasks (/tasks)
+- Kanban board (To Do, In Progress, Done)
+- Team member filtering
+- Priority indicators
+- Avatar badges
+
+### Timeline (/timeline)
+- Vertical milestone view
+- Current phase highlighting
+- Completion status icons
+- Date ranges
+
+### Budget (/budget)
+- One-time vs. monthly costs
+- Interactive pie chart
+- Break-even calculator
+- Revenue projections
+
+## 🚀 Deployment
+
+### Vercel (Recommended)
+
+```bash
+npm run build
+vercel deploy
+```
+
+### Other Platforms
+
+```bash
+npm run build
+npm start
+```
+
+## 📝 License
+
+This project was created for educational purposes.
+
+---
+
+**Built with ❤️ for EdTech startups**
