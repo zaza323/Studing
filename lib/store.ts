@@ -7,9 +7,10 @@
 
 // ===== تعريف الأنواع =====
 
-export type EquipmentStatus = "للشراء" | "تم الطلب" | "تم الاستلام";
+export type AssetStatus = "للشراء" | "تم الطلب" | "تم الاستلام";
 export type TaskStatus = "قيد الانتظار" | "قيد التنفيذ" | "مكتملة";
 export type Priority = "عالية" | "متوسطة" | "منخفضة";
+export type AssetCategory = "Production" | "Infrastructure" | "Licenses" | "Electronics";
 
 export interface TeamMember {
     id: string;
@@ -18,12 +19,12 @@ export interface TeamMember {
     avatar: string; // كود لون للأفاتار
 }
 
-export interface Equipment {
+export interface Asset {
     id: string;
     name: string;
-    category: string;
+    category: AssetCategory;
     price: number;
-    status: EquipmentStatus;
+    status: AssetStatus;
     owner: string;
 }
 
@@ -48,10 +49,6 @@ export interface Milestone {
 
 export interface Budget {
     totalBudget: number;
-    oneTimeCosts: {
-        category: string;
-        amount: number;
-    }[];
     monthlyCosts: {
         category: string;
         amount: number;
@@ -60,7 +57,6 @@ export interface Budget {
 }
 
 // ===== بيانات أعضاء الفريق =====
-// عدّل الأسماء والأدوار وألوان الأفاتار حسب الحاجة
 export const teamMembers: TeamMember[] = [
     {
         id: "1",
@@ -88,14 +84,13 @@ export const teamMembers: TeamMember[] = [
     },
 ];
 
-// ===== قائمة المعدات =====
-// أضف أو احذف أو عدّل عناصر المعدات هنا
-// الأسعار بالعملة المحلية
-export const equipment: Equipment[] = [
+// ===== قائمة الأصول والممتلكات =====
+export const assets: Asset[] = [
+    // Production Assets
     {
         id: "1",
         name: "كاميرا Sony FX30",
-        category: "كاميرا",
+        category: "Production",
         price: 1799,
         status: "تم الاستلام",
         owner: "أحمد حسن",
@@ -103,105 +98,85 @@ export const equipment: Equipment[] = [
     {
         id: "2",
         name: "عدسة Sigma 16mm f/1.4",
-        category: "عدسة",
+        category: "Production",
         price: 399,
         status: "تم الاستلام",
         owner: "أحمد حسن",
     },
     {
         id: "3",
-        name: "عدسة Sigma 30mm f/1.4",
-        category: "عدسة",
-        price: 339,
-        status: "تم الطلب",
-        owner: "أحمد حسن",
-    },
-    {
-        id: "4",
         name: "ميكروفون Rode Wireless GO II",
-        category: "ميكروفون",
+        category: "Production",
         price: 299,
         status: "تم الاستلام",
         owner: "أحمد حسن",
+    },
+
+    // Infrastructure Assets
+    {
+        id: "4",
+        name: "نظام كاميرات مراقبة Ring",
+        category: "Infrastructure",
+        price: 450,
+        status: "تم الطلب",
+        owner: "الاستوديو",
     },
     {
         id: "5",
-        name: "ميكروفون Rode NTG4+ Shotgun",
-        category: "ميكروفون",
-        price: 299,
-        status: "للشراء",
-        owner: "سارة إبراهيم",
+        name: "أثاث مكتبي (طاولات وكراسي)",
+        category: "Infrastructure",
+        price: 1200,
+        status: "تم الاستلام",
+        owner: "الاستوديو",
     },
     {
         id: "6",
-        name: "طقم إضاءة Aputure MC RGBWW",
-        category: "إضاءة",
-        price: 299,
-        status: "تم الاستلام",
+        name: "وحدة تكييف هواء سبليت",
+        category: "Infrastructure",
+        price: 800,
+        status: "للشراء",
         owner: "الاستوديو",
     },
+
+    // Electronics Assets
     {
         id: "7",
-        name: "إضاءة Aputure Amaran 200d",
-        category: "إضاءة",
-        price: 345,
-        status: "تم الطلب",
-        owner: "الاستوديو",
-    },
-    {
-        id: "8",
-        name: "حامل ثلاثي Manfrotto MT055XPRO3",
-        category: "دعامات",
-        price: 199,
-        status: "تم الاستلام",
-        owner: "الاستوديو",
-    },
-    {
-        id: "9",
         name: "جهاز مونتاج (Ryzen 9 + RTX 4070)",
-        category: "كمبيوتر",
+        category: "Electronics",
         price: 2499,
         status: "تم الاستلام",
         owner: "سارة إبراهيم",
     },
     {
-        id: "10",
+        id: "8",
         name: "شاشة LG 27\" 4K (27UP850)",
-        category: "شاشة",
+        category: "Electronics",
         price: 449,
         status: "تم الاستلام",
         owner: "سارة إبراهيم",
     },
+
+    // Licenses
     {
-        id: "11",
-        name: "Elgato Stream Deck",
-        category: "ملحقات",
-        price: 149,
+        id: "9",
+        name: "رخصة تجارية سنوية",
+        category: "Licenses",
+        price: 500,
+        status: "تم الاستلام",
+        owner: "ليلى أحمد",
+    },
+    {
+        id: "10",
+        name: "تصريح تصوير سينمائي",
+        category: "Licenses",
+        price: 150,
         status: "للشراء",
-        owner: "أحمد حسن",
-    },
-    {
-        id: "12",
-        name: "خلفية شاشة خضراء",
-        category: "خلفيات",
-        price: 89,
-        status: "تم الاستلام",
-        owner: "الاستوديو",
-    },
-    {
-        id: "13",
-        name: "طقم تنظيم كابلات",
-        category: "كابلات",
-        price: 45,
-        status: "تم الاستلام",
-        owner: "الاستوديو",
+        owner: "ليلى أحمد",
     },
 ];
 
 // ===== بيانات المهام =====
-// أدر مهام فريقك هنا
 export const tasks: Task[] = [
-    // قيد الانتظار
     {
         id: "1",
         title: "تسجيل الدرس 6: الدوال المتقدمة",
@@ -218,94 +193,10 @@ export const tasks: Task[] = [
         assignee: "3",
         priority: "متوسطة",
     },
-    {
-        id: "3",
-        title: "إعداد حملة البريد الإلكتروني",
-        description: "تحضير سلسلة رسائل بريد إلكتروني قبل الإطلاق",
-        status: "قيد الانتظار",
-        assignee: "3",
-        priority: "عالية",
-    },
-    {
-        id: "4",
-        title: "شراء المعدات المتبقية",
-        description: "طلب عدسة Sigma 30mm وميكروفون Shotgun",
-        status: "قيد الانتظار",
-        assignee: "4",
-        priority: "متوسطة",
-    },
-
-    // قيد التنفيذ
-    {
-        id: "5",
-        title: "مونتاج الدرس 4: الحلقات والتكرار",
-        description: "تدريج الألوان وإضافة الرسومات للدرس 4",
-        status: "قيد التنفيذ",
-        assignee: "2",
-        priority: "عالية",
-    },
-    {
-        id: "6",
-        title: "الانتهاء من إعداد الصوت بالاستوديو",
-        description: "اختبار وتحسين المعالجة الصوتية",
-        status: "قيد التنفيذ",
-        assignee: "1",
-        priority: "متوسطة",
-    },
-    {
-        id: "7",
-        title: "بناء الصفحة الرئيسية",
-        description: "إنشاء صفحة الدورة مع التسعير",
-        status: "قيد التنفيذ",
-        assignee: "3",
-        priority: "عالية",
-    },
-
-    // مكتملة
-    {
-        id: "8",
-        title: "إعداد إضاءة الاستوديو",
-        description: "إعداد نظام الإضاءة الثلاثية",
-        status: "مكتملة",
-        assignee: "1",
-        priority: "عالية",
-    },
-    {
-        id: "9",
-        title: "مونتاج الدرس 1: المقدمة",
-        description: "إكمال مونتاج درس المقدمة",
-        status: "مكتملة",
-        assignee: "2",
-        priority: "عالية",
-    },
-    {
-        id: "10",
-        title: "مونتاج الدرس 2: المتغيرات وأنواع البيانات",
-        description: "إكمال مونتاج الدرس 2",
-        status: "مكتملة",
-        assignee: "2",
-        priority: "عالية",
-    },
-    {
-        id: "11",
-        title: "مونتاج الدرس 3: الشروط",
-        description: "إكمال مونتاج الدرس 3",
-        status: "مكتملة",
-        assignee: "2",
-        priority: "متوسطة",
-    },
-    {
-        id: "12",
-        title: "إنشاء محتوى وسائل التواصل",
-        description: "تصميم منشورات لإنستغرام وتويتر",
-        status: "مكتملة",
-        assignee: "3",
-        priority: "منخفضة",
-    },
+    // ... يمكن إضافة المزيد من المهام هنا
 ];
 
 // ===== الجدول الزمني / المعالم =====
-// حدد مراحل مشروعك والتواريخ
 export const milestones: Milestone[] = [
     {
         id: "1",
@@ -337,20 +228,8 @@ export const milestones: Milestone[] = [
 ];
 
 // ===== بيانات الميزانية =====
-// حدّث التكاليف وافتراضات الإيرادات هنا
 export const budget: Budget = {
-    totalBudget: 15000, // إجمالي الميزانية المخصصة للمشروع
-
-    // التكاليف لمرة واحدة للمعدات
-    oneTimeCosts: [
-        { category: "الكاميرات والعدسات", amount: 2537 },
-        { category: "معدات الصوت", amount: 598 },
-        { category: "الإضاءة", amount: 644 },
-        { category: "الكمبيوتر والشاشة", amount: 2948 },
-        { category: "الملحقات والكابلات", amount: 283 },
-    ],
-
-    // التكاليف الشهرية المتكررة
+    totalBudget: 15000,
     monthlyCosts: [
         { category: "الكهرباء", amount: 150 },
         { category: "الإنترنت", amount: 80 },
@@ -358,25 +237,117 @@ export const budget: Budget = {
         { category: "الاستضافة والدومين", amount: 25 },
         { category: "إعلانات التسويق", amount: 200 },
     ],
-
-    // افتراض: الإيرادات لكل طالب شهرياً
-    revenuePerStudent: 49.99, // سعر الاشتراك الشهري
+    revenuePerStudent: 49.99,
 };
+
+// ===== بيانات الاستراتيجية =====
+
+export interface Idea {
+    id: string;
+    title: string;
+    content: string;
+    category: string;
+    color: string;
+    createdAt: string;
+}
+
+export interface Competitor {
+    id: string;
+    name: string;
+    logo: string;
+    pricePoint: string;
+    strengths: string[];
+    weaknesses: string[];
+    url: string;
+    notes?: string;
+}
+
+export const initialCategories: string[] = ["General", "Marketing", "Product", "Feature", "Content"];
+
+export const initialIdeas: Idea[] = [
+    {
+        id: '1',
+        title: 'كورس الرياضيات المجاني',
+        content: 'إطلاق كورس مجاني بالكامل لمبادئ الرياضيات لجذب طلاب جدد.',
+        category: 'Content',
+        color: 'bg-yellow-100',
+        createdAt: '2026-01-20'
+    },
+    {
+        id: '2',
+        title: 'نظام المكافآت',
+        content: 'تطبيق نظام نقاط (Gamification) لتحفيز الطلاب على إكمال الدروس.',
+        category: 'Feature',
+        color: 'bg-blue-100',
+        createdAt: '2026-02-01'
+    },
+    {
+        id: '3',
+        title: 'حملة المؤثرين',
+        content: 'التعاون مع 5 مؤثرين في مجال التعليم للترويج للمنصة.',
+        category: 'Marketing',
+        color: 'bg-purple-100',
+        createdAt: '2026-02-03'
+    },
+];
+
+export const initialCompetitors: Competitor[] = [
+    {
+        id: '1',
+        name: 'JoAcademy',
+        logo: 'bg-blue-600',
+        strengths: ['قاعدة طلاب ضخمة', 'علامة تجارية قوية', 'محتوى متنوع'],
+        weaknesses: ['واجهة قديمة', 'أسعار مرتفعة', 'دعم فني بطيء'],
+        pricePoint: '$$$',
+        url: 'joacademy.com',
+        notes: ''
+    },
+    {
+        id: '2',
+        name: 'Abwaab',
+        logo: 'bg-indigo-500',
+        strengths: ['تكنولوجيا حديثة', 'دروس قصيرة', 'أسعار منافسة'],
+        weaknesses: ['تغطية مواد أقل', 'غياب التفاعل المباشر'],
+        pricePoint: '$$',
+        url: 'abwaab.com',
+        notes: ''
+    },
+    {
+        id: '3',
+        name: 'Weted',
+        logo: 'bg-emerald-500',
+        strengths: ['مجتمع طلابي قوي', 'اختبارات مكثفة'],
+        weaknesses: ['تصميم بسيط', 'تسويق محدود'],
+        pricePoint: '$',
+        url: 'weted.com',
+        notes: ''
+    },
+];
 
 // ===== دوال مساعدة =====
 
-export function getTotalEquipmentCost(): number {
-    return equipment.reduce((sum, item) => sum + item.price, 0);
+export function getTotalAssetsCost(): number {
+    return assets.reduce((sum, item) => sum + item.price, 0);
 }
 
-export function getEquipmentBudgetUsed(): number {
-    return equipment
+export function getAssetsBudgetUsed(): number {
+    return assets
         .filter((item) => item.status === "تم الاستلام" || item.status === "تم الطلب")
         .reduce((sum, item) => sum + item.price, 0);
 }
 
-export function getTotalOneTimeCosts(): number {
-    return budget.oneTimeCosts.reduce((sum, cost) => sum + cost.amount, 0);
+export function getAssetCategoryTotals(): { name: string; value: number }[] {
+    const categories: Record<string, number> = {};
+
+    assets.forEach(asset => {
+        if (categories[asset.category]) {
+            categories[asset.category] += asset.price;
+        } else {
+            categories[asset.category] = asset.price;
+        }
+    });
+
+    return Object.entries(categories).map(([name, value]) => ({ name, value }));
 }
 
 export function getTotalMonthlyCosts(): number {
@@ -388,22 +359,20 @@ export function getBreakEvenStudents(): number {
     return Math.ceil(monthlyCosts / budget.revenuePerStudent);
 }
 
-export function getTasksByStatus(status: TaskStatus): Task[] {
-    return tasks.filter((task) => task.status === status);
-}
-
-export function getTasksByAssignee(assigneeId: string): Task[] {
-    return tasks.filter((task) => task.assignee === assigneeId);
-}
-
 export function getTeamMemberById(id: string): TeamMember | undefined {
     return teamMembers.find((member) => member.id === id);
 }
 
 export function getDaysUntilLaunch(): number {
-    const launchDate = new Date("2026-04-30"); // بناءً على تاريخ نهاية المرحلة 3
+    const launchDate = new Date("2026-04-30");
     const today = new Date();
     const diffTime = launchDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
+}
+
+export function getCategoryTotal(category: string): number {
+    return assets
+        .filter((asset) => asset.category === category)
+        .reduce((sum, asset) => sum + asset.price, 0);
 }

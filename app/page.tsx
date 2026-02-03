@@ -10,14 +10,14 @@ import {
 } from "lucide-react";
 import {
   budget,
-  getTotalOneTimeCosts,
+  getTotalAssetsCost,
   getTotalMonthlyCosts,
   tasks,
   getDaysUntilLaunch,
 } from "@/lib/store";
 
 export default function Home() {
-  const totalOneTime = getTotalOneTimeCosts();
+  const totalOneTime = getTotalAssetsCost();
   const budgetSpent = totalOneTime;
   const budgetRemaining = budget.totalBudget - budgetSpent;
   const activeTasks = tasks.filter((task) => task.status !== "مكتملة").length;
@@ -64,8 +64,8 @@ export default function Home() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <QuickActionButton
             icon={Package}
-            label="إضافة معدات"
-            href="/inventory"
+            label="إضافة أصل"
+            href="/assets"
           />
           <QuickActionButton
             icon={Plus}
