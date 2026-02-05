@@ -10,7 +10,11 @@
 export type AssetStatus = "للشراء" | "تم الطلب" | "تم الاستلام";
 export type TaskStatus = "قيد الانتظار" | "قيد التنفيذ" | "مكتملة";
 export type Priority = "عالية" | "متوسطة" | "منخفضة";
-export type AssetCategory = "Production" | "Infrastructure" | "Licenses" | "Electronics";
+export type AssetCategory = "Production" | "Infrastructure" | "Licenses" | "Electronics" | "Furniture";
+
+// New Types for Monthly Expenses
+export type ExpenseCategory = "Software" | "Utilities" | "Other";
+export type ExpenseStatus = "Active" | "Paused" | "Cancelled";
 
 export interface TeamMember {
     id: string;
@@ -26,6 +30,15 @@ export interface Asset {
     price: number;
     status: AssetStatus;
     owner: string;
+}
+
+export interface MonthlyExpense {
+    id: string;
+    name: string;
+    category: ExpenseCategory;
+    amount: number;
+    status: ExpenseStatus;
+    billingDate?: string;
 }
 
 export interface Task {
@@ -49,10 +62,7 @@ export interface Milestone {
 
 export interface Budget {
     totalBudget: number;
-    monthlyCosts: {
-        category: string;
-        amount: number;
-    }[];
+    monthlyCosts: MonthlyExpense[];
     revenuePerStudent: number; // الإيرادات الشهرية لكل طالب
 }
 
@@ -60,27 +70,15 @@ export interface Budget {
 export const teamMembers: TeamMember[] = [
     {
         id: "1",
-        name: "أحمد حسن",
-        role: "منشئ المحتوى والمعلم",
+        name: "محمد ظاظا",
+        role: "المدير التنفيذي",
         avatar: "#10b981", // أخضر زمردي
     },
     {
         id: "2",
-        name: "سارة إبراهيم",
-        role: "محررة فيديو",
+        name: "مريم الملي",
+        role: "مالك الشركة",
         avatar: "#06b6d4", // سماوي
-    },
-    {
-        id: "3",
-        name: "عمر خالد",
-        role: "مسؤول التسويق",
-        avatar: "#8b5cf6", // بنفسجي
-    },
-    {
-        id: "4",
-        name: "ليلى أحمد",
-        role: "مديرة العمليات",
-        avatar: "#ec4899", // وردي
     },
 ];
 
@@ -93,7 +91,7 @@ export const assets: Asset[] = [
         category: "Production",
         price: 1799,
         status: "تم الاستلام",
-        owner: "أحمد حسن",
+        owner: "محمد ظاظا",
     },
     {
         id: "2",
@@ -101,7 +99,7 @@ export const assets: Asset[] = [
         category: "Production",
         price: 399,
         status: "تم الاستلام",
-        owner: "أحمد حسن",
+        owner: "محمد ظاظا",
     },
     {
         id: "3",
@@ -109,7 +107,7 @@ export const assets: Asset[] = [
         category: "Production",
         price: 299,
         status: "تم الاستلام",
-        owner: "أحمد حسن",
+        owner: "محمد ظاظا",
     },
 
     // Infrastructure Assets
@@ -119,15 +117,15 @@ export const assets: Asset[] = [
         category: "Infrastructure",
         price: 450,
         status: "تم الطلب",
-        owner: "الاستوديو",
+        owner: "مريم الملي",
     },
     {
         id: "5",
         name: "أثاث مكتبي (طاولات وكراسي)",
-        category: "Infrastructure",
+        category: "Furniture",
         price: 1200,
         status: "تم الاستلام",
-        owner: "الاستوديو",
+        owner: "مريم الملي",
     },
     {
         id: "6",
@@ -135,7 +133,7 @@ export const assets: Asset[] = [
         category: "Infrastructure",
         price: 800,
         status: "للشراء",
-        owner: "الاستوديو",
+        owner: "مريم الملي",
     },
 
     // Electronics Assets
@@ -145,7 +143,7 @@ export const assets: Asset[] = [
         category: "Electronics",
         price: 2499,
         status: "تم الاستلام",
-        owner: "سارة إبراهيم",
+        owner: "محمد ظاظا",
     },
     {
         id: "8",
@@ -153,7 +151,7 @@ export const assets: Asset[] = [
         category: "Electronics",
         price: 449,
         status: "تم الاستلام",
-        owner: "سارة إبراهيم",
+        owner: "محمد ظاظا",
     },
 
     // Licenses
@@ -163,7 +161,7 @@ export const assets: Asset[] = [
         category: "Licenses",
         price: 500,
         status: "تم الاستلام",
-        owner: "ليلى أحمد",
+        owner: "مريم الملي",
     },
     {
         id: "10",
@@ -171,7 +169,7 @@ export const assets: Asset[] = [
         category: "Licenses",
         price: 150,
         status: "للشراء",
-        owner: "ليلى أحمد",
+        owner: "مريم الملي",
     },
 ];
 
@@ -190,7 +188,7 @@ export const tasks: Task[] = [
         title: "تصميم صور مصغرة للدورة",
         description: "إنشاء صور مصغرة احترافية لجميع الدروس العشرة",
         status: "قيد الانتظار",
-        assignee: "3",
+        assignee: "2",
         priority: "متوسطة",
     },
     // ... يمكن إضافة المزيد من المهام هنا
@@ -231,11 +229,13 @@ export const milestones: Milestone[] = [
 export const budget: Budget = {
     totalBudget: 15000,
     monthlyCosts: [
-        { category: "الكهرباء", amount: 150 },
-        { category: "الإنترنت", amount: 80 },
-        { category: "Adobe Creative Cloud", amount: 55 },
-        { category: "الاستضافة والدومين", amount: 25 },
-        { category: "إعلانات التسويق", amount: 200 },
+        { id: "1", name: "الكهرباء", category: "Utilities", amount: 150, status: "Active" },
+        { id: "2", name: "الإنترنت", category: "Utilities", amount: 80, status: "Active" },
+        { id: "3", name: "المياه", category: "Utilities", amount: 40, status: "Active" },
+        { id: "4", name: "Adobe Creative Cloud", category: "Software", amount: 55, status: "Active" },
+        { id: "5", name: "Freepik", category: "Software", amount: 15, status: "Paused" },
+        { id: "6", name: "استضافة ودومين", category: "Software", amount: 25, status: "Active" },
+        { id: "7", name: "إعلانات التسويق", category: "Other", amount: 200, status: "Active" },
     ],
     revenuePerStudent: 49.99,
 };
@@ -363,10 +363,14 @@ export function getTeamMemberById(id: string): TeamMember | undefined {
     return teamMembers.find((member) => member.id === id);
 }
 
-export function getDaysUntilLaunch(): number {
-    const launchDate = new Date("2026-04-30");
-    const today = new Date();
-    const diffTime = launchDate.getTime() - today.getTime();
+export const defaultLaunchDate = "2026-04-30";
+
+export function getDaysUntilLaunch(launchDateString: string = defaultLaunchDate, now: Date = new Date()): number {
+    const launchDate = new Date(launchDateString);
+    if (Number.isNaN(launchDate.getTime())) {
+        return 0;
+    }
+    const diffTime = launchDate.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays > 0 ? diffDays : 0;
 }
@@ -375,4 +379,10 @@ export function getCategoryTotal(category: string): number {
     return assets
         .filter((asset) => asset.category === category)
         .reduce((sum, asset) => sum + asset.price, 0);
+}
+
+export function getExpenseCategoryTotal(category: string): number {
+    return budget.monthlyCosts
+        .filter((item) => item.category === category)
+        .reduce((sum, item) => sum + item.amount, 0);
 }

@@ -1,14 +1,41 @@
 "use client";
 
-import { useState } from "react";
-import { tasks as initialTasks, teamMembers, getTeamMemberById } from "@/lib/store";
-import type { Task, TaskStatus, Priority } from "@/lib/store";
-import { Filter, Plus, Trash2, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { teamMembers, getTeamMemberById } from "@/lib/store";
+import type { Task as BaseTask, TaskStatus, Priority } from "@/lib/store";
+import { Filter, Plus, Trash2, X, Loader2 } from "lucide-react";
+
+// Extend Task to support MongoDB _id
+interface Task extends Omit<BaseTask, "id"> {
+    _id: string;
+    id?: string;
+}
 
 export default function TasksPage() {
-    const [tasks, setTasks] = useState<Task[]>(initialTasks);
+    const [tasks, setTasks] = useState<Task[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState<string>("all");
     const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false);
+
+    // Fetch Tasks
+    useEffect(() => {
+        fetchTasks();
+    }, []);
+
+    const fetchTasks = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch("/api/tasks");
+            if (res.ok) {
+                const data = await res.json();
+                setTasks(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch tasks", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     const filteredTasks =
         selectedMember === "all"
@@ -22,30 +49,67 @@ export default function TasksPage() {
     };
 
     // Create new task
-    const handleCreateTask = (newTask: Omit<Task, "id">) => {
-        const taskWithId: Task = {
-            ...newTask,
-            id: Date.now().toString(), // Simple unique ID
-        };
-        setTasks([...tasks, taskWithId]);
-        setIsNewTaskDialogOpen(false);
+    const handleCreateTask = async (newTask: Omit<Task, "_id" | "id">) => {
+        try {
+            const res = await fetch("/api/tasks", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newTask),
+            });
+            if (res.ok) {
+                const savedTask = await res.json();
+                setTasks([...tasks, savedTask]);
+                setIsNewTaskDialogOpen(false);
+            }
+        } catch (error) {
+            console.error("Failed to create task", error);
+        }
     };
 
     // Delete task
-    const handleDeleteTask = (taskId: string) => {
+    const handleDeleteTask = async (taskId: string) => {
         if (confirm("هل أنت متأكد من حذف هذه المهمة؟")) {
-            setTasks(tasks.filter((task) => task.id !== taskId));
+            try {
+                const res = await fetch(`/api/tasks/${taskId}`, {
+                    method: "DELETE",
+                });
+                if (res.ok) {
+                    setTasks(tasks.filter((task) => task._id !== taskId));
+                }
+            } catch (error) {
+                console.error("Failed to delete task", error);
+            }
         }
     };
 
     // Update task status
-    const handleUpdateTaskStatus = (taskId: string, newStatus: TaskStatus) => {
-        setTasks(
-            tasks.map((task) =>
-                task.id === taskId ? { ...task, status: newStatus } : task
-            )
-        );
+    const handleUpdateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
+        try {
+            const res = await fetch(`/api/tasks/${taskId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: newStatus }),
+            });
+            if (res.ok) {
+                const updatedTask = await res.json();
+                setTasks(
+                    tasks.map((task) =>
+                        task._id === taskId ? updatedTask : task
+                    )
+                );
+            }
+        } catch (error) {
+            console.error("Failed to update task status", error);
+        }
     };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen p-4 sm:p-6 lg:p-8">
@@ -145,7 +209,7 @@ function TaskColumn({
             <div className="space-y-3">
                 {tasks.map((task) => (
                     <TaskCard
-                        key={task.id}
+                        key={task._id}
                         task={task}
                         onDelete={onDeleteTask}
                         onUpdateStatus={onUpdateTaskStatus}
@@ -181,7 +245,7 @@ function TaskCard({
         <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow relative group">
             {/* Delete Button */}
             <button
-                onClick={() => onDelete(task.id)}
+                onClick={() => onDelete(task._id)}
                 className="absolute top-2 left-2 p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
                 title="حذف المهمة"
             >
@@ -231,12 +295,12 @@ function TaskCard({
                             <button
                                 key={status}
                                 onClick={() => {
-                                    onUpdateStatus(task.id, status);
+                                    onUpdateStatus(task._id, status);
                                     setShowStatusMenu(false);
                                 }}
                                 className={`w-full text-right px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${task.status === status
-                                        ? "bg-emerald-50 text-emerald-700 font-semibold"
-                                        : "text-gray-700"
+                                    ? "bg-emerald-50 text-emerald-700 font-semibold"
+                                    : "text-gray-700"
                                     }`}
                             >
                                 {status}
@@ -255,7 +319,7 @@ function NewTaskDialog({
     onCreate,
 }: {
     onClose: () => void;
-    onCreate: (task: Omit<Task, "id">) => void;
+    onCreate: (task: Omit<Task, "_id" | "id">) => void;
 }) {
     const [formData, setFormData] = useState({
         title: "",

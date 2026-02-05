@@ -1,13 +1,40 @@
 "use client";
 
-import { useState } from "react";
-import { milestones as initialMilestones } from "@/lib/store";
-import type { Milestone } from "@/lib/store";
-import { Calendar, CheckCircle2, Clock, Circle, Plus, Trash2, X, ToggleRight, ToggleLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import type { Milestone as BaseMilestone } from "@/lib/store";
+import { Calendar, CheckCircle2, Clock, Circle, Plus, Trash2, X, Loader2, Pencil } from "lucide-react";
+
+// Extend Milestone to support MongoDB _id
+interface Milestone extends Omit<BaseMilestone, "id"> {
+    _id: string;
+    id?: string;
+}
 
 export default function TimelinePage() {
-    const [milestones, setMilestones] = useState<Milestone[]>(initialMilestones);
+    const [milestones, setMilestones] = useState<Milestone[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+    const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null);
+
+    // Fetch Milestones
+    useEffect(() => {
+        fetchMilestones();
+    }, []);
+
+    const fetchMilestones = async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch("/api/timeline");
+            if (res.ok) {
+                const data = await res.json();
+                setMilestones(data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch milestones", error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Sorting: Ensure milestones are sorted by start date
     const sortedMilestones = [...milestones].sort((a, b) =>
@@ -15,35 +42,130 @@ export default function TimelinePage() {
     );
 
     // Handlers
-    const handleAddPhase = (newPhase: Omit<Milestone, "id">) => {
-        const phase: Milestone = {
-            ...newPhase,
-            id: Date.now().toString(),
-        };
-        setMilestones([...milestones, phase]);
-        setIsAddModalOpen(false);
-    };
-
-    const handleDeletePhase = (id: string) => {
-        if (confirm("هل أنت متأكد من حذف هذه المرحلة؟")) {
-            setMilestones(milestones.filter(m => m.id !== id));
+    const handleAddPhase = async (newPhase: Omit<Milestone, "_id" | "id" | "isComplete" | "isCurrent">) => {
+        try {
+            const res = await fetch("/api/timeline", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ...newPhase,
+                    isComplete: false,
+                    isCurrent: false,
+                }),
+            });
+            if (res.ok) {
+                const savedPhase = await res.json();
+                setMilestones([...milestones, savedPhase]);
+                setIsAddModalOpen(false);
+            }
+        } catch (error) {
+            console.error("Failed to add phase", error);
         }
     };
 
-    const handleToggleComplete = (id: string) => {
-        setMilestones(milestones.map(m =>
-            m.id === id ? { ...m, isComplete: !m.isComplete } : m
-        ));
+    const handleDeletePhase = async (id: string) => {
+        if (confirm("هل أنت متأكد من حذف هذه المرحلة؟")) {
+            try {
+                const res = await fetch(`/api/timeline/${id}`, {
+                    method: "DELETE",
+                });
+                if (res.ok) {
+                    setMilestones(milestones.filter(m => m._id !== id));
+                }
+            } catch (error) {
+                console.error("Failed to delete phase", error);
+            }
+        }
     };
 
-    const handleSetCurrent = (id: string) => {
-        // Only one phase can be current, or toggle off if same clicked
-        setMilestones(milestones.map(m =>
-            m.id === id
-                ? { ...m, isCurrent: !m.isCurrent }
-                : { ...m, isCurrent: false } // Reset others if we are setting a new current
-        ));
+    const handleEditPhase = async (updatedPhase: Omit<Milestone, "_id" | "id" | "isComplete" | "isCurrent">) => {
+        if (!editingMilestone) return;
+        try {
+            const res = await fetch(`/api/timeline/${editingMilestone._id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ...updatedPhase,
+                    isComplete: editingMilestone.isComplete,
+                    isCurrent: editingMilestone.isCurrent,
+                }),
+            });
+            if (res.ok) {
+                const updated = await res.json();
+                setMilestones(milestones.map(m => m._id === updated._id ? updated : m));
+                setEditingMilestone(null);
+            }
+        } catch (error) {
+            console.error("Failed to edit phase", error);
+        }
     };
+
+    const handleToggleComplete = async (id: string) => {
+        const milestone = milestones.find(m => m._id === id);
+        if (!milestone) return;
+
+        try {
+            const res = await fetch(`/api/timeline/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isComplete: !milestone.isComplete }),
+            });
+            if (res.ok) {
+                const updated = await res.json();
+                setMilestones(milestones.map(m =>
+                    m._id === id ? updated : m
+                ));
+            }
+        } catch (error) {
+            console.error("Failed to toggle complete", error);
+        }
+    };
+
+    const handleSetCurrent = async (id: string) => {
+        const milestone = milestones.find(m => m._id === id);
+        if (!milestone) return;
+
+        const newIsCurrent = !milestone.isCurrent;
+
+        try {
+            // If setting to true, ideally unset others first (optional but good for consistency)
+            if (newIsCurrent) {
+                const others = milestones.filter(m => m.isCurrent && m._id !== id);
+                await Promise.all(others.map(m =>
+                    fetch(`/api/timeline/${m._id}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ isCurrent: false })
+                    })
+                ));
+            }
+
+            const res = await fetch(`/api/timeline/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ isCurrent: newIsCurrent }),
+            });
+
+            if (res.ok) {
+                const updated = await res.json();
+                setMilestones(milestones.map(m => {
+                    if (m._id === id) return updated;
+                    if (newIsCurrent && m.isCurrent) return { ...m, isCurrent: false };
+                    return m;
+                }));
+            }
+        } catch (error) {
+            console.error("Failed to set current", error);
+        }
+    };
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen p-4 sm:p-6 lg:p-8">
@@ -75,13 +197,14 @@ export default function TimelinePage() {
 
                         {/* Milestones */}
                         <div className="space-y-8">
-                            {sortedMilestones.map((milestone, index) => (
+                            {sortedMilestones.map((milestone) => (
                                 <MilestoneCard
-                                    key={milestone.id}
+                                    key={milestone._id}
                                     milestone={milestone}
-                                    onDelete={() => handleDeletePhase(milestone.id)}
-                                    onToggleComplete={() => handleToggleComplete(milestone.id)}
-                                    onSetCurrent={() => handleSetCurrent(milestone.id)}
+                                    onDelete={() => handleDeletePhase(milestone._id)}
+                                    onEdit={() => setEditingMilestone(milestone)}
+                                    onToggleComplete={() => handleToggleComplete(milestone._id)}
+                                    onSetCurrent={() => handleSetCurrent(milestone._id)}
                                 />
                             ))}
                         </div>
@@ -91,9 +214,20 @@ export default function TimelinePage() {
 
             {/* Add Phase Modal */}
             {isAddModalOpen && (
-                <AddPhaseModal
+                <PhaseModal
                     onClose={() => setIsAddModalOpen(false)}
-                    onAdd={handleAddPhase}
+                    onSubmit={handleAddPhase}
+                    title="إضافة مرحلة جديدة"
+                    submitLabel="إضافة المرحلة"
+                />
+            )}
+            {editingMilestone && (
+                <PhaseModal
+                    onClose={() => setEditingMilestone(null)}
+                    onSubmit={handleEditPhase}
+                    title="تعديل المرحلة"
+                    submitLabel="حفظ التعديلات"
+                    initialData={editingMilestone}
                 />
             )}
         </div>
@@ -103,11 +237,13 @@ export default function TimelinePage() {
 function MilestoneCard({
     milestone,
     onDelete,
+    onEdit,
     onToggleComplete,
     onSetCurrent,
 }: {
     milestone: Milestone;
     onDelete: () => void;
+    onEdit: () => void;
     onToggleComplete: () => void;
     onSetCurrent: () => void;
 }) {
@@ -166,6 +302,13 @@ function MilestoneCard({
                         {/* Action Buttons (visible on hover or if active) */}
                         <div className="flex items-center gap-2">
                             <button
+                                onClick={onEdit}
+                                className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                title="تعديل المرحلة"
+                            >
+                                <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
                                 onClick={onDelete}
                                 className="opacity-0 group-hover:opacity-100 p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                                 title="حذف المرحلة"
@@ -218,22 +361,32 @@ function MilestoneCard({
     );
 }
 
-function AddPhaseModal({ onClose, onAdd }: { onClose: () => void, onAdd: (p: Omit<Milestone, "id">) => void }) {
+function PhaseModal({
+    onClose,
+    onSubmit,
+    title,
+    submitLabel,
+    initialData,
+}: {
+    onClose: () => void;
+    onSubmit: (p: Omit<Milestone, "_id" | "id" | "isComplete" | "isCurrent">) => void;
+    title: string;
+    submitLabel: string;
+    initialData?: Milestone;
+}) {
     const [formData, setFormData] = useState({
-        phase: "",
-        description: "",
-        startDate: "",
-        endDate: ""
+        phase: initialData?.phase ?? "",
+        description: initialData?.description ?? "",
+        startDate: initialData?.startDate ?? "",
+        endDate: initialData?.endDate ?? ""
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.phase || !formData.startDate || !formData.endDate) return;
 
-        onAdd({
+        onSubmit({
             ...formData,
-            isComplete: false,
-            isCurrent: false
         });
     };
 
@@ -241,7 +394,7 @@ function AddPhaseModal({ onClose, onAdd }: { onClose: () => void, onAdd: (p: Omi
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="flex items-center justify-between p-5 border-b border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-900">إضافة مرحلة جديدة</h3>
+                    <h3 className="text-lg font-bold text-gray-900">{title}</h3>
                     <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full">
                         <X className="w-5 h-5" />
                     </button>
@@ -299,7 +452,7 @@ function AddPhaseModal({ onClose, onAdd }: { onClose: () => void, onAdd: (p: Omi
                             type="submit"
                             className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
                         >
-                            إضافة المرحلة
+                            {submitLabel}
                         </button>
                         <button
                             type="button"

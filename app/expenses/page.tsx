@@ -2,39 +2,38 @@
 
 import { useState, useEffect, Suspense, type ElementType } from "react";
 import { useSearchParams } from "next/navigation";
-import { teamMembers } from "@/lib/store";
-import type { Asset as BaseAsset, AssetStatus, AssetCategory } from "@/lib/store";
-import { Package, Plus, Trash2, X, FolderOpen, CircuitBoard, FileCheck, Truck, DollarSign, Pencil, Loader2 } from "lucide-react";
+import type { MonthlyExpense as BaseMonthlyExpense, ExpenseCategory, ExpenseStatus } from "@/lib/store";
+import { Plus, Trash2, X, FolderOpen, Receipt, Zap, Box, DollarSign, Pencil, Loader2 } from "lucide-react";
 
-// Extend or redefine Asset to support MongoDB _id
-interface Asset extends Omit<BaseAsset, "id"> {
+// Extend to support MongoDB _id
+interface MonthlyExpense extends Omit<BaseMonthlyExpense, "id"> {
     _id: string;
-    id?: string; // Optional for compatibility
+    id?: string;
 }
 
-function AssetsContent() {
+function ExpensesContent() {
     const searchParams = useSearchParams();
-    const [assets, setAssets] = useState<Asset[]>([]);
+    const [expenses, setExpenses] = useState<MonthlyExpense[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
-    const [selectedCategory, setSelectedCategory] = useState<AssetCategory | "All">("All");
+    const [editingExpense, setEditingExpense] = useState<MonthlyExpense | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | "All">("All");
 
-    // Fetch Assets
+    // Fetch Expenses
     useEffect(() => {
-        fetchAssets();
+        fetchExpenses();
     }, []);
 
-    const fetchAssets = async () => {
+    const fetchExpenses = async () => {
         setIsLoading(true);
         try {
-            const res = await fetch("/api/assets");
+            const res = await fetch("/api/expenses");
             if (res.ok) {
                 const data = await res.json();
-                setAssets(data);
+                setExpenses(data);
             }
         } catch (error) {
-            console.error("Failed to fetch assets", error);
+            console.error("Failed to fetch expenses", error);
         } finally {
             setIsLoading(false);
         }
@@ -44,95 +43,91 @@ function AssetsContent() {
     useEffect(() => {
         const categoryParam = searchParams.get("category");
         if (categoryParam) {
-            if (["Production", "Infrastructure", "Electronics", "Licenses", "Furniture"].includes(categoryParam)) {
-                setSelectedCategory(categoryParam as AssetCategory);
+            if (["Software", "Utilities", "Other"].includes(categoryParam)) {
+                setSelectedCategory(categoryParam as ExpenseCategory);
             }
         } else {
             setSelectedCategory("All");
         }
     }, [searchParams]);
 
-    // Filter Assets
-    const filteredAssets = selectedCategory === "All"
-        ? assets
-        : assets.filter(a => a.category === selectedCategory);
+    // Filter Expenses
+    const filteredExpenses = selectedCategory === "All"
+        ? expenses
+        : expenses.filter(e => e.category === selectedCategory);
 
     // Category Metrics Calculation
-    const getCategoryMetrics = (category: AssetCategory) => {
-        const categoryAssets = assets.filter(a => a.category === category);
-        const count = categoryAssets.length;
-        const totalCost = categoryAssets.reduce((sum, item) => sum + item.price, 0);
+    const getCategoryMetrics = (category: ExpenseCategory) => {
+        const categoryExpenses = expenses.filter(e => e.category === category);
+        const count = categoryExpenses.length;
+        const totalCost = categoryExpenses.reduce((sum, item) => sum + item.amount, 0);
         return { count, totalCost };
     };
 
     // Handlers
-    const handleAddAsset = async (newAsset: Omit<Asset, "_id" | "id">) => {
+    const handleAddExpense = async (newExpense: Omit<MonthlyExpense, "_id" | "id">) => {
         try {
-            const res = await fetch("/api/assets", {
+            const res = await fetch("/api/expenses", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(newAsset),
+                body: JSON.stringify(newExpense),
             });
             if (res.ok) {
-                const savedAsset = await res.json();
-                setAssets([...assets, savedAsset]);
+                const savedExpense = await res.json();
+                setExpenses([...expenses, savedExpense]);
                 setIsAddModalOpen(false);
-            } else {
-                const errData = await res.json();
-                alert(`Error adding asset: ${errData.error || res.statusText}`);
             }
         } catch (error) {
-            console.error("Failed to add asset", error);
-            alert("Failed to add asset. Check console for details.");
+            console.error("Failed to add expense", error);
         }
     };
 
-    const handleUpdateAsset = async (updatedAsset: Omit<Asset, "_id" | "id">) => {
-        if (!editingAsset) return;
+    const handleUpdateExpense = async (updatedExpense: Omit<MonthlyExpense, "_id" | "id">) => {
+        if (!editingExpense) return;
         try {
-            const res = await fetch(`/api/assets/${editingAsset._id}`, {
+            const res = await fetch(`/api/expenses/${editingExpense._id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(updatedAsset),
+                body: JSON.stringify(updatedExpense),
             });
             if (res.ok) {
-                const savedAsset = await res.json();
-                setAssets(assets.map(a =>
-                    a._id === editingAsset._id ? savedAsset : a
+                const savedExpense = await res.json();
+                setExpenses(expenses.map(e =>
+                    e._id === editingExpense._id ? savedExpense : e
                 ));
-                setEditingAsset(null);
+                setEditingExpense(null);
             }
         } catch (error) {
-            console.error("Failed to update asset", error);
+            console.error("Failed to update expense", error);
         }
     };
 
-    const handleDeleteAsset = async (id: string) => {
-        if (confirm("هل أنت متأكد من حذف هذا الأصل؟")) {
+    const handleDeleteExpense = async (id: string) => {
+        if (confirm("هل أنت متأكد من حذف هذا المصروف؟")) {
             try {
-                const res = await fetch(`/api/assets/${id}`, {
+                const res = await fetch(`/api/expenses/${id}`, {
                     method: "DELETE",
                 });
                 if (res.ok) {
-                    setAssets(assets.filter((a) => a._id !== id));
+                    setExpenses(expenses.filter((e) => e._id !== id));
                 }
             } catch (error) {
-                console.error("Failed to delete asset", error);
+                console.error("Failed to delete expense", error);
             }
         }
     };
 
-    const handleUpdateStatus = async (id: string, newStatus: AssetStatus) => {
+    const handleUpdateStatus = async (id: string, newStatus: ExpenseStatus) => {
         try {
-            const res = await fetch(`/api/assets/${id}`, {
+            const res = await fetch(`/api/expenses/${id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: newStatus }),
             });
             if (res.ok) {
-                const savedAsset = await res.json();
-                setAssets(assets.map(a =>
-                    a._id === id ? savedAsset : a
+                const savedExpense = await res.json();
+                setExpenses(expenses.map(e =>
+                    e._id === id ? savedExpense : e
                 ));
             }
         } catch (error) {
@@ -153,9 +148,9 @@ function AssetsContent() {
             {/* Header */}
             <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">الأصول والممتلكات</h1>
+                    <h1 className="text-3xl font-bold text-gray-900">المصاريف الشهرية</h1>
                     <p className="text-gray-600 mt-1">
-                        إدارة شاملة لجميع أصول الاستوديو والبنية التحتية
+                        إدارة التكاليف التشغيلية والاشتراكات الشهرية
                     </p>
                 </div>
                 <button
@@ -163,15 +158,15 @@ function AssetsContent() {
                     className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
                 >
                     <Plus className="w-5 h-5" />
-                    إضافة أصل جديد
+                    إضافة مصرف جديد
                 </button>
             </div>
 
             {/* Grand Total Summary */}
             <div className="mb-8 bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl p-6 text-white shadow-lg flex items-center justify-between">
                 <div>
-                    <h2 className="text-lg font-medium text-gray-300">إجمالي قيمة الأصول</h2>
-                    <p className="text-4xl font-bold mt-1">${assets.reduce((sum, item) => sum + item.price, 0).toLocaleString()}</p>
+                    <h2 className="text-lg font-medium text-gray-300">إجمالي المصاريف الشهرية</h2>
+                    <p className="text-4xl font-bold mt-1">${expenses.reduce((sum, item) => sum + item.amount, 0).toLocaleString()}<span className="text-lg font-normal text-gray-400">/شهر</span></p>
                 </div>
                 <div className="p-4 bg-white/10 rounded-full">
                     <DollarSign className="w-8 h-8 text-emerald-400" />
@@ -179,64 +174,46 @@ function AssetsContent() {
             </div>
 
             {/* Category Breakdown Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
                 <CategoryCard
-                    title="إنتاج وتصوير"
-                    category="Production"
-                    icon={Package}
-                    color="emerald"
-                    metrics={getCategoryMetrics("Production")}
-                    isSelected={selectedCategory === "Production"}
-                    onClick={() => setSelectedCategory(selectedCategory === "Production" ? "All" : "Production")}
-                />
-                <CategoryCard
-                    title="بنية تحتية"
-                    category="Infrastructure"
-                    icon={Truck}
+                    title="الخدمات والاشتراكات الرقمية"
+                    category="Software"
+                    icon={Receipt}
                     color="blue"
-                    metrics={getCategoryMetrics("Infrastructure")}
-                    isSelected={selectedCategory === "Infrastructure"}
-                    onClick={() => setSelectedCategory(selectedCategory === "Infrastructure" ? "All" : "Infrastructure")}
+                    metrics={getCategoryMetrics("Software")}
+                    isSelected={selectedCategory === "Software"}
+                    onClick={() => setSelectedCategory(selectedCategory === "Software" ? "All" : "Software")}
                 />
                 <CategoryCard
-                    title="الأثاث"
-                    category="Furniture"
-                    icon={Package}
+                    title="خدمات أساسية"
+                    category="Utilities"
+                    icon={Zap} // Using Zap for Utilities/Electricity
+                    color="emerald"
+                    metrics={getCategoryMetrics("Utilities")}
+                    isSelected={selectedCategory === "Utilities"}
+                    onClick={() => setSelectedCategory(selectedCategory === "Utilities" ? "All" : "Utilities")}
+                />
+                <CategoryCard
+                    title="رواتب الموظفين"
+                    category="Other"
+                    icon={Box}
                     color="orange"
-                    metrics={getCategoryMetrics("Furniture")}
-                    isSelected={selectedCategory === "Furniture"}
-                    onClick={() => setSelectedCategory(selectedCategory === "Furniture" ? "All" : "Furniture")}
-                />
-                <CategoryCard
-                    title="أجهزة إلكترونية"
-                    category="Electronics"
-                    icon={CircuitBoard}
-                    color="purple"
-                    metrics={getCategoryMetrics("Electronics")}
-                    isSelected={selectedCategory === "Electronics"}
-                    onClick={() => setSelectedCategory(selectedCategory === "Electronics" ? "All" : "Electronics")}
-                />
-                <CategoryCard
-                    title="تراخيص وتصاريح"
-                    category="Licenses"
-                    icon={FileCheck}
-                    color="orange"
-                    metrics={getCategoryMetrics("Licenses")}
-                    isSelected={selectedCategory === "Licenses"}
-                    onClick={() => setSelectedCategory(selectedCategory === "Licenses" ? "All" : "Licenses")}
+                    metrics={getCategoryMetrics("Other")}
+                    isSelected={selectedCategory === "Other"}
+                    onClick={() => setSelectedCategory(selectedCategory === "Other" ? "All" : "Other")}
                 />
             </div>
 
-            {/* Assets Table */}
+            {/* Expenses Table */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
                     <h3 className="font-bold text-gray-700 flex items-center gap-2">
                         <FolderOpen className="w-5 h-5" />
-                        قائمة الأصول
+                        قائمة المصاريف
                         {selectedCategory !== "All" && <span className="text-sm font-normal text-gray-500">({selectedCategory})</span>}
                     </h3>
                     <span className="text-sm text-gray-500">
-                        {filteredAssets.length} عنصر
+                        {filteredExpenses.length} عنصر
                     </span>
                 </div>
 
@@ -246,45 +223,43 @@ function AssetsContent() {
                             <tr>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاسم</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الفئة</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التكلفة</th>
+                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التكلفة الشهرية</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الحالة</th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المسؤول</th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">إجراءات</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredAssets.length === 0 ? (
+                            {filteredExpenses.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                                        لا توجد أصول في هذه الفئة.
+                                    <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                                        لا توجد مصاريف في هذه الفئة.
                                     </td>
                                 </tr>
                             ) : (
-                                filteredAssets.map((asset) => (
-                                    <tr key={asset._id} className="hover:bg-gray-50 transition-colors group">
-                                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{asset.name}</td>
+                                filteredExpenses.map((expense) => (
+                                    <tr key={expense._id} className="hover:bg-gray-50 transition-colors group">
+                                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{expense.name}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                            <CategoryBadge category={asset.category} />
+                                            <CategoryBadge category={expense.category} />
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${asset.price.toLocaleString()}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${expense.amount.toLocaleString()}</td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <StatusDropdown
-                                                currentStatus={asset.status}
-                                                onUpdate={(s) => handleUpdateStatus(asset._id, s)}
+                                                currentStatus={expense.status}
+                                                onUpdate={(s) => handleUpdateStatus(expense._id, s)}
                                             />
                                         </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{asset.owner}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <button
-                                                    onClick={() => setEditingAsset(asset)}
+                                                    onClick={() => setEditingExpense(expense)}
                                                     className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50"
                                                     title="تعديل"
                                                 >
                                                     <Pencil className="w-4 h-4" />
                                                 </button>
                                                 <button
-                                                    onClick={() => handleDeleteAsset(asset._id)}
+                                                    onClick={() => handleDeleteExpense(expense._id)}
                                                     className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded-full hover:bg-red-50"
                                                     title="حذف"
                                                 >
@@ -300,37 +275,37 @@ function AssetsContent() {
                 </div>
             </div>
 
-            {/* Add Asset Modal */}
+            {/* Add Expense Modal */}
             {isAddModalOpen && (
-                <AssetModal
+                <ExpenseModal
                     onClose={() => setIsAddModalOpen(false)}
-                    onSave={handleAddAsset}
-                    title="إضافة أصل جديد"
+                    onSave={handleAddExpense}
+                    title="إضافة مصروف جديد"
                 />
             )}
 
-            {/* Edit Asset Modal */}
-            {editingAsset && (
-                <AssetModal
-                    onClose={() => setEditingAsset(null)}
-                    onSave={handleUpdateAsset}
-                    initialData={editingAsset}
-                    title="تعديل الأصل"
+            {/* Edit Expense Modal */}
+            {editingExpense && (
+                <ExpenseModal
+                    onClose={() => setEditingExpense(null)}
+                    onSave={handleUpdateExpense}
+                    initialData={editingExpense}
+                    title="تعديل المصروف"
                 />
             )}
         </div>
     );
 }
 
-export default function AssetsPage() {
+export default function ExpensesPage() {
     return (
         <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-600" /></div>}>
-            <AssetsContent />
+            <ExpensesContent />
         </Suspense>
     );
 }
 
-type CategoryColor = "emerald" | "blue" | "purple" | "orange";
+type CategoryColor = "emerald" | "blue" | "orange";
 
 type CategoryMetrics = {
     count: number;
@@ -350,7 +325,6 @@ function CategoryCard({ title, icon: Icon, color, metrics, isSelected, onClick }
     const colorClasses: Record<CategoryColor, string> = {
         emerald: "bg-emerald-50 text-emerald-600 border-emerald-200",
         blue: "bg-blue-50 text-blue-600 border-blue-200",
-        purple: "bg-purple-50 text-purple-600 border-purple-200",
         orange: "bg-orange-50 text-orange-600 border-orange-200",
     };
 
@@ -383,21 +357,17 @@ function CategoryCard({ title, icon: Icon, color, metrics, isSelected, onClick }
     );
 }
 
-function CategoryBadge({ category }: { category: AssetCategory }) {
-    const styles: Record<AssetCategory, string> = {
-        Production: "bg-emerald-100 text-emerald-800",
-        Infrastructure: "bg-blue-100 text-blue-800",
-        Electronics: "bg-purple-100 text-purple-800",
-        Licenses: "bg-orange-100 text-orange-800",
-        Furniture: "bg-yellow-100 text-yellow-800",
+function CategoryBadge({ category }: { category: ExpenseCategory }) {
+    const styles: Record<ExpenseCategory, string> = {
+        Software: "bg-blue-100 text-blue-800",
+        Utilities: "bg-emerald-100 text-emerald-800",
+        Other: "bg-orange-100 text-orange-800",
     };
 
-    const labels: Record<AssetCategory, string> = {
-        Production: "إنتاج",
-        Infrastructure: "بنية تحتية",
-        Electronics: "إلكترونيات",
-        Licenses: "تراخيص",
-        Furniture: "الأثاث",
+    const labels: Record<ExpenseCategory, string> = {
+        Software: "الخدمات والاشتراكات الرقمية",
+        Utilities: "خدمات أساسية",
+        Other: "رواتب الموظفين",
     };
 
     return (
@@ -407,13 +377,19 @@ function CategoryBadge({ category }: { category: AssetCategory }) {
     );
 }
 
-function StatusDropdown({ currentStatus, onUpdate }: { currentStatus: AssetStatus, onUpdate: (s: AssetStatus) => void }) {
+function StatusDropdown({ currentStatus, onUpdate }: { currentStatus: ExpenseStatus, onUpdate: (s: ExpenseStatus) => void }) {
     const [isOpen, setIsOpen] = useState(false);
 
     const styles = {
-        "للشراء": "bg-gray-100 text-gray-700 border-gray-300",
-        "تم الطلب": "bg-yellow-100 text-yellow-700 border-yellow-300",
-        "تم الاستلام": "bg-emerald-100 text-emerald-700 border-emerald-300",
+        "Active": "bg-emerald-100 text-emerald-700 border-emerald-300",
+        "Paused": "bg-yellow-100 text-yellow-700 border-yellow-300",
+        "Cancelled": "bg-red-100 text-red-700 border-red-300",
+    };
+
+    const labels = {
+        "Active": "نشط",
+        "Paused": "موقف",
+        "Cancelled": "ملغى",
     };
 
     return (
@@ -422,24 +398,24 @@ function StatusDropdown({ currentStatus, onUpdate }: { currentStatus: AssetStatu
                 onClick={() => setIsOpen(!isOpen)}
                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border transition-colors cursor-pointer ${styles[currentStatus]}`}
             >
-                {currentStatus}
+                {labels[currentStatus]}
             </button>
 
             {isOpen && (
                 <>
                     <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
                     <div className="absolute right-0 z-20 mt-1 w-32 bg-white rounded-md shadow-lg border border-gray-200 py-1">
-                        {["للشراء", "تم الطلب", "تم الاستلام"].map((status) => (
+                        {["Active", "Paused", "Cancelled"].map((status) => (
                             <button
                                 key={status}
                                 onClick={() => {
-                                    onUpdate(status as AssetStatus);
+                                    onUpdate(status as ExpenseStatus);
                                     setIsOpen(false);
                                 }}
                                 className={`block w-full text-right px-4 py-2 text-xs hover:bg-gray-100 ${status === currentStatus ? "text-emerald-600 font-bold" : "text-gray-700"
                                     }`}
                             >
-                                {status}
+                                {labels[status as ExpenseStatus]}
                             </button>
                         ))}
                     </div>
@@ -449,36 +425,31 @@ function StatusDropdown({ currentStatus, onUpdate }: { currentStatus: AssetStatu
     );
 }
 
-function AssetModal({
+function ExpenseModal({
     onClose,
     onSave,
     initialData,
     title
 }: {
     onClose: () => void,
-    onSave: (item: Omit<Asset, "_id" | "id">) => void,
-    initialData?: Asset,
+    onSave: (item: Omit<MonthlyExpense, "_id" | "id">) => void,
+    initialData?: MonthlyExpense,
     title: string
 }) {
-    const ownerOptions = teamMembers.map((member) => member.name);
     const [formData, setFormData] = useState({
         name: initialData?.name || "",
-        category: initialData?.category || "Production" as AssetCategory,
-        price: initialData?.price?.toString() || "",
-        owner: (initialData?.owner && ownerOptions.includes(initialData.owner))
-            ? initialData.owner
-            : ownerOptions[0] ?? "",
-        status: initialData?.status || "للشراء" as AssetStatus
+        category: initialData?.category || "Software" as ExpenseCategory,
+        amount: initialData?.amount?.toString() || "",
+        status: initialData?.status || "Active" as ExpenseStatus
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.name || !formData.price) return;
+        if (!formData.name || !formData.amount) return;
         onSave({
             name: formData.name,
             category: formData.category,
-            price: parseFloat(formData.price),
-            owner: formData.owner || "--",
+            amount: parseFloat(formData.amount),
             status: formData.status
         });
     };
@@ -495,14 +466,14 @@ function AssetModal({
 
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">اسم الأصل</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">اسم المصروف</label>
                         <input
                             required
                             type="text"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
-                            placeholder="مثال: كاميرا Sony"
+                            placeholder="مثال: اشتراك Zoom"
                         />
                     </div>
 
@@ -512,56 +483,38 @@ function AssetModal({
                             <select
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
                                 value={formData.category}
-                                onChange={e => setFormData({ ...formData, category: e.target.value as AssetCategory })}
+                                onChange={e => setFormData({ ...formData, category: e.target.value as ExpenseCategory })}
                             >
-                                <option value="Production">إنتاج وتصوير</option>
-                                <option value="Infrastructure">بنية تحتية</option>
-                                <option value="Furniture">الأثاث</option>
-                                <option value="Electronics">أجهزة إلكترونية</option>
-                                <option value="Licenses">تراخيص وتصاريح</option>
+                                <option value="Software">الخدمات والاشتراكات الرقمية</option>
+                                <option value="Utilities">خدمات أساسية</option>
+                                <option value="Other">رواتب الموظفين</option>
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">السعر ($)</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">التكلفة الشهرية ($)</label>
                             <input
                                 required
                                 type="number"
                                 min="0"
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                value={formData.price}
-                                onChange={e => setFormData({ ...formData, price: e.target.value })}
+                                value={formData.amount}
+                                onChange={e => setFormData({ ...formData, amount: e.target.value })}
                                 placeholder="0.00"
                             />
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">المالك / المسؤول</label>
-                            <select
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                value={formData.owner}
-                                onChange={e => setFormData({ ...formData, owner: e.target.value })}
-                            >
-                                {ownerOptions.map((owner) => (
-                                    <option key={owner} value={owner}>
-                                        {owner}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
-                            <select
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                value={formData.status}
-                                onChange={e => setFormData({ ...formData, status: e.target.value as AssetStatus })}
-                            >
-                                <option value="للشراء">للشراء</option>
-                                <option value="تم الطلب">تم الطلب</option>
-                                <option value="تم الاستلام">تم الاستلام</option>
-                            </select>
-                        </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
+                        <select
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.status}
+                            onChange={e => setFormData({ ...formData, status: e.target.value as ExpenseStatus })}
+                        >
+                            <option value="Active">نشط</option>
+                            <option value="Paused">موقف مؤقتاً</option>
+                            <option value="Cancelled">ملغى</option>
+                        </select>
                     </div>
 
                     <button

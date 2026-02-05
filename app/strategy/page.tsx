@@ -1,13 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import {
-    initialIdeas,
-    initialCompetitors,
-    initialCategories
-} from "@/lib/store";
-import type { Idea, Competitor } from "@/lib/store";
-import { Plus, Trash2, ExternalLink, Lightbulb, Target, X, Edit2, Check, GripVertical } from "lucide-react";
+import { useState, useEffect, type ElementType, type ReactNode } from "react";
+import type { Idea as BaseIdea, Competitor as BaseCompetitor } from "@/lib/store";
+import { Plus, Trash2, ExternalLink, Lightbulb, Target, X, Edit2, Check, GripVertical, Loader2 } from "lucide-react";
 import {
     DndContext,
     closestCenter,
@@ -26,17 +21,61 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+// Extend types for MongoDB
+interface Idea extends Omit<BaseIdea, "id"> {
+    _id: string;
+    id?: string;
+}
+
+interface Competitor extends Omit<BaseCompetitor, "id"> {
+    _id: string;
+    id?: string;
+}
+
+const initialCategories = ["General", "Marketing", "Product", "Sales"];
+
 export default function StrategyPage() {
     const [activeTab, setActiveTab] = useState<'ideas' | 'competitors'>('competitors');
+    const [isLoading, setIsLoading] = useState(true);
 
     // Local State for Data
-    const [ideas, setIdeas] = useState<Idea[]>(initialIdeas);
+    const [ideas, setIdeas] = useState<Idea[]>([]);
     const [categories, setCategories] = useState<string[]>(initialCategories);
-    const [competitors, setCompetitors] = useState<Competitor[]>(initialCompetitors);
+    const [competitors, setCompetitors] = useState<Competitor[]>([]);
 
     // Modal State
     const [ideaModal, setIdeaModal] = useState<{ isOpen: boolean, editingId: string | null }>({ isOpen: false, editingId: null });
     const [competitorModal, setCompetitorModal] = useState<{ isOpen: boolean, editingId: string | null }>({ isOpen: false, editingId: null });
+
+    // Fetch Data
+    useEffect(() => {
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                const [ideasRes, competitorsRes] = await Promise.all([
+                    fetch("/api/strategy/ideas"),
+                    fetch("/api/strategy/competitors")
+                ]);
+
+                if (ideasRes.ok && competitorsRes.ok) {
+                    const ideasData = await ideasRes.json();
+                    const competitorsData = await competitorsRes.json();
+                    setIdeas(ideasData);
+                    setCompetitors(competitorsData);
+
+                    // Extract unique categories from fetched ideas
+                    const fetchedCategories = Array.from(new Set(ideasData.map((i: Idea) => i.category))) as string[];
+                    setCategories(prev => Array.from(new Set([...prev, ...fetchedCategories])));
+                }
+            } catch (error) {
+                console.error("Failed to fetch strategy data", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
 
     // DnD Sensors
     const sensors = useSensors(
@@ -55,16 +94,17 @@ export default function StrategyPage() {
         const { active, over } = event;
 
         if (over && active.id !== over.id) {
+            // Note: Optimistic UI update only. Backend reordering not implemented in this version.
             if (type === 'ideas') {
                 setIdeas((items) => {
-                    const oldIndex = items.findIndex((i) => i.id === active.id);
-                    const newIndex = items.findIndex((i) => i.id === over.id);
+                    const oldIndex = items.findIndex((i) => i._id === active.id);
+                    const newIndex = items.findIndex((i) => i._id === over.id);
                     return arrayMove(items, oldIndex, newIndex);
                 });
             } else if (type === 'competitors') {
                 setCompetitors((items) => {
-                    const oldIndex = items.findIndex((i) => i.id === active.id);
-                    const newIndex = items.findIndex((i) => i.id === over.id);
+                    const oldIndex = items.findIndex((i) => i._id === active.id);
+                    const newIndex = items.findIndex((i) => i._id === over.id);
                     return arrayMove(items, oldIndex, newIndex);
                 });
             }
@@ -72,22 +112,48 @@ export default function StrategyPage() {
     };
 
     // --- Idea Logic ---
-    const handleSaveIdea = (idea: Omit<Idea, "id" | "createdAt">) => {
-        if (ideaModal.editingId) {
-            setIdeas(ideas.map(i => i.id === ideaModal.editingId ? { ...i, ...idea } : i));
-        } else {
-            const newIdea = {
-                ...idea,
-                id: Date.now().toString(),
-                createdAt: new Date().toISOString().split('T')[0]
-            };
-            setIdeas([...ideas, newIdea]);
+    const handleSaveIdea = async (idea: Omit<Idea, "_id" | "id" | "createdAt">) => {
+        try {
+            if (ideaModal.editingId) {
+                const res = await fetch(`/api/strategy/ideas/${ideaModal.editingId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(idea),
+                });
+                if (res.ok) {
+                    const updated = await res.json();
+                    setIdeas(ideas.map(i => i._id === ideaModal.editingId ? updated : i));
+                }
+            } else {
+                const res = await fetch("/api/strategy/ideas", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(idea),
+                });
+                if (res.ok) {
+                    const saved = await res.json();
+                    setIdeas([...ideas, saved]);
+                }
+            }
+            setIdeaModal({ isOpen: false, editingId: null });
+        } catch (error) {
+            console.error("Failed to save idea", error);
         }
-        setIdeaModal({ isOpen: false, editingId: null });
     };
 
-    const handleDeleteIdea = (id: string) => {
-        if (confirm("هل أنت متأكد من حذف هذه الفكرة؟")) setIdeas(ideas.filter(i => i.id !== id));
+    const handleDeleteIdea = async (id: string) => {
+        if (confirm("هل أنت متأكد من حذف هذه الفكرة؟")) {
+            try {
+                const res = await fetch(`/api/strategy/ideas/${id}`, {
+                    method: "DELETE",
+                });
+                if (res.ok) {
+                    setIdeas(ideas.filter(i => i._id !== id));
+                }
+            } catch (error) {
+                console.error("Failed to delete idea", error);
+            }
+        }
     };
 
     const handleAddCategory = (newCategory: string) => {
@@ -97,19 +163,57 @@ export default function StrategyPage() {
     };
 
     // --- Competitor Logic ---
-    const handleSaveCompetitor = (competitor: Omit<Competitor, "id">) => {
-        if (competitorModal.editingId) {
-            setCompetitors(competitors.map(c => c.id === competitorModal.editingId ? { ...c, ...competitor } : c));
-        } else {
-            setCompetitors([...competitors, { ...competitor, id: Date.now().toString() }]);
+    const handleSaveCompetitor = async (competitor: Omit<Competitor, "_id" | "id">) => {
+        try {
+            if (competitorModal.editingId) {
+                const res = await fetch(`/api/strategy/competitors/${competitorModal.editingId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(competitor),
+                });
+                if (res.ok) {
+                    const updated = await res.json();
+                    setCompetitors(competitors.map(c => c._id === competitorModal.editingId ? updated : c));
+                }
+            } else {
+                const res = await fetch("/api/strategy/competitors", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(competitor),
+                });
+                if (res.ok) {
+                    const saved = await res.json();
+                    setCompetitors([...competitors, saved]);
+                }
+            }
+            setCompetitorModal({ isOpen: false, editingId: null });
+        } catch (error) {
+            console.error("Failed to save competitor", error);
         }
-        setCompetitorModal({ isOpen: false, editingId: null });
     };
 
-    const handleDeleteCompetitor = (id: string) => {
-        if (confirm("هل أنت متأكد من حذف هذا المنافس؟")) setCompetitors(competitors.filter(c => c.id !== id));
+    const handleDeleteCompetitor = async (id: string) => {
+        if (confirm("هل أنت متأكد من حذف هذا المنافس؟")) {
+            try {
+                const res = await fetch(`/api/strategy/competitors/${id}`, {
+                    method: "DELETE",
+                });
+                if (res.ok) {
+                    setCompetitors(competitors.filter(c => c._id !== id));
+                }
+            } catch (error) {
+                console.error("Failed to delete competitor", error);
+            }
+        }
     };
 
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen p-4 sm:p-6 lg:p-8 space-y-8">
@@ -159,13 +263,13 @@ export default function StrategyPage() {
                             onDragEnd={(e) => handleDragEnd(e, 'ideas')}
                         >
                             <SortableContext
-                                items={ideas.map(i => i.id)}
+                                items={ideas.map(i => i._id)}
                                 strategy={rectSortingStrategy}
                             >
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                     {ideas.map(idea => (
                                         <SortableIdeaCard
-                                            key={idea.id}
+                                            key={idea._id}
                                             idea={idea}
                                             onEdit={(id) => setIdeaModal({ isOpen: true, editingId: id })}
                                             onDelete={handleDeleteIdea}
@@ -207,13 +311,13 @@ export default function StrategyPage() {
                             onDragEnd={(e) => handleDragEnd(e, 'competitors')}
                         >
                             <SortableContext
-                                items={competitors.map(c => c.id)}
+                                items={competitors.map(c => c._id)}
                                 strategy={rectSortingStrategy}
                             >
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
                                     {competitors.map(comp => (
                                         <SortableCompetitorCard
-                                            key={comp.id}
+                                            key={comp._id}
                                             comp={comp}
                                             onEdit={(id) => setCompetitorModal({ isOpen: true, editingId: id })}
                                             onDelete={handleDeleteCompetitor}
@@ -237,10 +341,9 @@ export default function StrategyPage() {
             {/* Modals */}
             {ideaModal.isOpen && (
                 <IdeaDialog
-                    isOpen={ideaModal.isOpen}
                     onClose={() => setIdeaModal({ isOpen: false, editingId: null })}
                     onSave={handleSaveIdea}
-                    editingIdea={ideas.find(i => i.id === ideaModal.editingId)}
+                    editingIdea={ideas.find(i => i._id === ideaModal.editingId)}
                     availableCategories={categories}
                     onAddCategory={handleAddCategory}
                 />
@@ -248,10 +351,9 @@ export default function StrategyPage() {
 
             {competitorModal.isOpen && (
                 <CompetitorDialog
-                    isOpen={competitorModal.isOpen}
                     onClose={() => setCompetitorModal({ isOpen: false, editingId: null })}
                     onSave={handleSaveCompetitor}
-                    editingComp={competitors.find(c => c.id === competitorModal.editingId)}
+                    editingComp={competitors.find(c => c._id === competitorModal.editingId)}
                 />
             )}
         </div>
@@ -268,7 +370,7 @@ function SortableIdeaCard({ idea, onEdit, onDelete }: { idea: Idea, onEdit: (id:
         transform,
         transition,
         isDragging
-    } = useSortable({ id: idea.id });
+    } = useSortable({ id: idea._id });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -295,7 +397,7 @@ function SortableIdeaCard({ idea, onEdit, onDelete }: { idea: Idea, onEdit: (id:
             {/* Actions */}
             <div className="absolute top-3 left-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 <button
-                    onClick={(e) => { e.stopPropagation(); onEdit(idea.id); }}
+                    onClick={(e) => { e.stopPropagation(); onEdit(idea._id); }}
                     className="p-1.5 bg-white/60 hover:bg-white rounded-full text-gray-700 transition-colors"
                     title="تعديل"
                     onPointerDown={(e) => e.stopPropagation()}
@@ -303,7 +405,7 @@ function SortableIdeaCard({ idea, onEdit, onDelete }: { idea: Idea, onEdit: (id:
                     <Edit2 className="w-4 h-4" />
                 </button>
                 <button
-                    onClick={(e) => { e.stopPropagation(); onDelete(idea.id); }}
+                    onClick={(e) => { e.stopPropagation(); onDelete(idea._id); }}
                     className="p-1.5 bg-white/60 hover:bg-red-50 rounded-full text-gray-700 hover:text-red-600 transition-colors"
                     title="حذف"
                     onPointerDown={(e) => e.stopPropagation()}
@@ -323,7 +425,7 @@ function SortableIdeaCard({ idea, onEdit, onDelete }: { idea: Idea, onEdit: (id:
 
             <div className="mt-4 pt-4 border-t border-black/5 flex justify-end">
                 <span className="text-xs text-gray-500 font-medium">
-                    {idea.createdAt}
+                    {idea.createdAt ? new Date(idea.createdAt).toLocaleDateString("ar-EG") : ''}
                 </span>
             </div>
         </div>
@@ -338,7 +440,7 @@ function SortableCompetitorCard({ comp, onEdit, onDelete }: { comp: Competitor, 
         transform,
         transition,
         isDragging
-    } = useSortable({ id: comp.id });
+    } = useSortable({ id: comp._id });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -365,7 +467,7 @@ function SortableCompetitorCard({ comp, onEdit, onDelete }: { comp: Competitor, 
             {/* Actions */}
             <div className="absolute top-4 left-12 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 <button
-                    onClick={(e) => { e.stopPropagation(); onEdit(comp.id); }}
+                    onClick={(e) => { e.stopPropagation(); onEdit(comp._id); }}
                     className="p-1.5 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-600 transition-colors"
                     title="تعديل"
                     onPointerDown={(e) => e.stopPropagation()}
@@ -373,7 +475,7 @@ function SortableCompetitorCard({ comp, onEdit, onDelete }: { comp: Competitor, 
                     <Edit2 className="w-4 h-4" />
                 </button>
                 <button
-                    onClick={(e) => { e.stopPropagation(); onDelete(comp.id); }}
+                    onClick={(e) => { e.stopPropagation(); onDelete(comp._id); }}
                     className="p-1.5 bg-gray-50 hover:bg-red-50 rounded-md text-gray-600 hover:text-red-600 transition-colors"
                     title="حذف"
                     onPointerDown={(e) => e.stopPropagation()}
@@ -433,7 +535,51 @@ function SortableCompetitorCard({ comp, onEdit, onDelete }: { comp: Competitor, 
 
 // === Modals ===
 
-function IdeaDialog({ isOpen, onClose, onSave, editingIdea, availableCategories, onAddCategory }: any) {
+type IdeaFormPayload = {
+    title: string;
+    content: string;
+    category: string;
+    color: string;
+};
+
+type CompetitorFormPayload = {
+    name: string;
+    pricePoint: string;
+    url: string;
+    logo: string;
+    strengths: string[];
+    weaknesses: string[];
+};
+
+type IdeaDialogProps = {
+    onClose: () => void;
+    onSave: (payload: IdeaFormPayload) => void;
+    editingIdea?: Idea;
+    availableCategories: string[];
+    onAddCategory: (category: string) => void;
+};
+
+type CompetitorDialogProps = {
+    onClose: () => void;
+    onSave: (payload: CompetitorFormPayload) => void;
+    editingComp?: Competitor;
+};
+
+type ModalLayoutProps = {
+    title: string;
+    onClose: () => void;
+    children: ReactNode;
+    color?: string;
+};
+
+type TabButtonProps = {
+    active: boolean;
+    onClick: () => void;
+    icon: ElementType;
+    label: string;
+};
+
+function IdeaDialog({ onClose, onSave, editingIdea, availableCategories, onAddCategory }: IdeaDialogProps) {
     const [title, setTitle] = useState(editingIdea?.title || "");
     const [content, setContent] = useState(editingIdea?.content || "");
     const [category, setCategory] = useState(editingIdea?.category || "General");
@@ -536,7 +682,7 @@ function IdeaDialog({ isOpen, onClose, onSave, editingIdea, availableCategories,
     );
 }
 
-function CompetitorDialog({ isOpen, onClose, onSave, editingComp }: any) {
+function CompetitorDialog({ onClose, onSave, editingComp }: CompetitorDialogProps) {
     const [name, setName] = useState(editingComp?.name || "");
     const [pricePoint, setPricePoint] = useState(editingComp?.pricePoint || "$$");
     const [url, setUrl] = useState(editingComp?.url || "");
@@ -664,7 +810,7 @@ function CompetitorDialog({ isOpen, onClose, onSave, editingComp }: any) {
     );
 }
 
-function ModalLayout({ title, onClose, children, color }: any) {
+function ModalLayout({ title, onClose, children, color }: ModalLayoutProps) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
             <div className={`w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 bg-white ${color ? color : ''}`}>
@@ -682,13 +828,13 @@ function ModalLayout({ title, onClose, children, color }: any) {
     );
 }
 
-function TabButton({ active, onClick, icon: Icon, label }: any) {
+function TabButton({ active, onClick, icon: Icon, label }: TabButtonProps) {
     return (
         <button
             onClick={onClick}
             className={`flex items-center gap-2 px-6 py-3 font-medium transition-all relative top-[1px] ${active
-                    ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50'
+                : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}
         >
             <Icon className="w-4 h-4" />

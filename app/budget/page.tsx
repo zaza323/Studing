@@ -1,50 +1,119 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-    budget as initialBudget,
-    getAssetCategoryTotals,
-    getTotalAssetsCost
-} from "@/lib/store";
-import { DollarSign, TrendingUp, Users, Plus, Trash2, X } from "lucide-react";
+import type { MonthlyExpense as BaseMonthlyExpense, ExpenseCategory, Asset as BaseAsset } from "@/lib/store";
+import { DollarSign, TrendingUp, Users, Plus, Trash2, X, Loader2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
+// Extend types to support MongoDB _id
+interface MonthlyExpense extends Omit<BaseMonthlyExpense, "id"> {
+    _id: string;
+    id?: string;
+}
+
+interface Asset extends Omit<BaseAsset, "id"> {
+    _id: string;
+    id?: string;
+}
+
 export default function BudgetPage() {
-    // State for monthly costs (still editable manually)
-    const [monthlyCosts, setMonthlyCosts] = useState(initialBudget.monthlyCosts);
-
-    // Dynamic Data from Assets (Read-only on this page)
-    const [assetCategories, setAssetCategories] = useState<{ name: string, value: number }[]>([]);
-    const [totalOneTime, setTotalOneTime] = useState(0);
-
-    // Load asset data on mount
-    useEffect(() => {
-        setAssetCategories(getAssetCategoryTotals());
-        setTotalOneTime(getTotalAssetsCost());
-    }, []);
-
-    // State for modal
+    // State
+    const [monthlyCosts, setMonthlyCosts] = useState<MonthlyExpense[]>([]);
+    const [assets, setAssets] = useState<Asset[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-    // Local Calculations
+    // Constants (could be fetched from config or env in future)
+    const revenuePerStudent = 49.99;
+
+    // Fetch Data
+    useEffect(() => {
+        const fetchData = async () => {
+            setIsLoading(true);
+            try {
+                const [assetsRes, expensesRes] = await Promise.all([
+                    fetch("/api/assets"),
+                    fetch("/api/expenses")
+                ]);
+
+                if (assetsRes.ok && expensesRes.ok) {
+                    const assetsData = await assetsRes.json();
+                    const expensesData = await expensesRes.json();
+                    setAssets(assetsData);
+                    setMonthlyCosts(expensesData);
+                }
+            } catch (error) {
+                console.error("Failed to fetch budget data", error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchData();
+    }, []);
+
+    // Calculations
+    const totalOneTime = assets.reduce((sum, item) => sum + item.price, 0);
     const totalMonthly = monthlyCosts.reduce((sum, item) => sum + item.amount, 0);
-    const breakEvenStudents = Math.ceil(totalMonthly / initialBudget.revenuePerStudent);
+    const breakEvenStudents = Math.ceil(totalMonthly / revenuePerStudent);
 
-    // Handlers
-    const handleAddExpense = (newExpense: { category: string; amount: number }) => {
-        // Only handles monthly now
-        setMonthlyCosts([...monthlyCosts, newExpense]);
-        setIsAddModalOpen(false);
+    const getAssetCategoryTotals = () => {
+        const categories: Record<string, number> = {};
+        assets.forEach(asset => {
+            if (categories[asset.category]) {
+                categories[asset.category] += asset.price;
+            } else {
+                categories[asset.category] = asset.price;
+            }
+        });
+        return Object.entries(categories).map(([name, value]) => ({ name, value }));
     };
 
-    const handleDeleteExpense = (index: number) => {
-        setMonthlyCosts(monthlyCosts.filter((_, i) => i !== index));
-    };
-
-    // Chart Data (Use asset categories directly)
+    const assetCategories = getAssetCategoryTotals();
     const chartData = assetCategories;
 
+    // Handlers
+    const handleAddExpense = async (newExpense: Omit<MonthlyExpense, "_id" | "id" | "status">) => {
+        try {
+            const res = await fetch("/api/expenses", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...newExpense, status: "Active" }),
+            });
+            if (res.ok) {
+                const savedExpense = await res.json();
+                setMonthlyCosts([...monthlyCosts, savedExpense]);
+                setIsAddModalOpen(false);
+            }
+        } catch (error) {
+            console.error("Failed to add expense", error);
+        }
+    };
+
+    const handleDeleteExpense = async (id: string) => {
+        if (confirm("هل أنت متأكد من حذف هذا المصروف؟")) {
+            try {
+                const res = await fetch(`/api/expenses/${id}`, {
+                    method: "DELETE",
+                });
+                if (res.ok) {
+                    setMonthlyCosts(monthlyCosts.filter((c) => c._id !== id));
+                }
+            } catch (error) {
+                console.error("Failed to delete expense", error);
+            }
+        }
+    };
+
     const COLORS = ["#10b981", "#06b6d4", "#8b5cf6", "#f59e0b", "#ec4899", "#ef4444", "#3b82f6"];
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen p-4 sm:p-6 lg:p-8">
@@ -138,18 +207,21 @@ export default function BudgetPage() {
                         {monthlyCosts.length === 0 ? (
                             <p className="text-center text-gray-400 py-4">لا توجد تكاليف شهرية</p>
                         ) : (
-                            monthlyCosts.map((cost, index) => (
+                            monthlyCosts.map((cost) => (
                                 <div
-                                    key={index}
+                                    key={cost._id}
                                     className="flex items-center justify-between p-3 bg-gray-50 rounded-lg group"
                                 >
-                                    <span className="text-gray-700">{cost.category}</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-gray-700 font-medium">{cost.name}</span>
+                                        <span className="text-xs text-gray-400">{cost.category === "Software" ? "الخدمات والاشتراكات الرقمية" : cost.category === "Utilities" ? "خدمات أساسية" : "رواتب الموظفين"}</span>
+                                    </div>
                                     <div className="flex items-center gap-3">
                                         <span className="font-semibold text-gray-900">
                                             ${cost.amount.toLocaleString()}/شهر
                                         </span>
                                         <button
-                                            onClick={() => handleDeleteExpense(index)}
+                                            onClick={() => handleDeleteExpense(cost._id)}
                                             className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -184,8 +256,8 @@ export default function BudgetPage() {
                                     cx="50%"
                                     cy="50%"
                                     labelLine={false}
-                                    label={(props: any) =>
-                                        `${(props.percent ? props.percent * 100 : 0).toFixed(0)}%`
+                                    label={(props: { percent?: number }) =>
+                                        `${((props.percent ?? 0) * 100).toFixed(0)}%`
                                     }
                                     outerRadius={80}
                                     fill="#8884d8"
@@ -199,7 +271,7 @@ export default function BudgetPage() {
                                     ))}
                                 </Pie>
                                 <Tooltip
-                                    formatter={(value: any) => [`$${Number(value).toLocaleString()}`, "القيمة"]}
+                                    formatter={(value: number | string) => [`$${Number(value).toLocaleString()}`, "القيمة"]}
                                 />
                                 <Legend />
                             </PieChart>
@@ -216,7 +288,7 @@ export default function BudgetPage() {
                         <div className="p-4 bg-purple-50 rounded-lg">
                             <p className="text-sm text-gray-600 mb-1">الإيرادات المتوقعة لكل طالب</p>
                             <p className="text-2xl font-bold text-purple-600">
-                                ${initialBudget.revenuePerStudent}/شهر
+                                ${revenuePerStudent}/شهر
                             </p>
                         </div>
 
@@ -241,7 +313,7 @@ export default function BudgetPage() {
                 </div>
             </div>
 
-            {/* Add Cost Modal - Only for Monthly now */}
+            {/* Add Cost Modal */}
             {isAddModalOpen && (
                 <AddCostModal
                     onClose={() => setIsAddModalOpen(false)}
@@ -284,15 +356,16 @@ function AddCostModal({
     onAdd
 }: {
     onClose: () => void,
-    onAdd: (c: { category: string, amount: number }) => void
+    onAdd: (c: { name: string, category: ExpenseCategory, amount: number }) => void
 }) {
-    const [formData, setFormData] = useState({ category: "", amount: "" });
+    const [formData, setFormData] = useState({ name: "", category: "Software", amount: "" });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.category || !formData.amount) return;
+        if (!formData.name || !formData.amount) return;
         onAdd({
-            category: formData.category,
+            name: formData.name,
+            category: formData.category as ExpenseCategory,
             amount: parseFloat(formData.amount)
         });
     };
@@ -314,10 +387,23 @@ function AddCostModal({
                             required
                             type="text"
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.category}
-                            onChange={e => setFormData({ ...formData, category: e.target.value })}
+                            value={formData.name}
+                            onChange={e => setFormData({ ...formData, name: e.target.value })}
                             placeholder="مثال: فاتورة كهرباء، اشتراك Zoom"
                         />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">الفئة</label>
+                        <select
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={formData.category}
+                            onChange={e => setFormData({ ...formData, category: e.target.value })}
+                        >
+                            <option value="Software">الخدمات والاشتراكات الرقمية</option>
+                            <option value="Utilities">خدمات أساسية</option>
+                            <option value="Other">أخرى</option>
+                        </select>
                     </div>
 
                     <div>
@@ -352,3 +438,5 @@ function AddCostModal({
         </div>
     );
 }
+
+
