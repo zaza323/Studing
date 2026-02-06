@@ -1,15 +1,26 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Asset from '@/models/Asset';
-import { assets as seedAssets } from "@/lib/store";
 import { logActivity } from '@/lib/activity';
 
-type MemoryAsset = (typeof seedAssets)[number] & { _id: string };
+type MemoryAsset = {
+    _id: string;
+    id?: string;
+    name: string;
+    category: string;
+    price: number;
+    status: string;
+    owner: string;
+    note?: string;
+};
+
+const isProduction = process.env.VERCEL_ENV === "production";
 
 const globalForAssets = globalThis as unknown as { __memoryAssets?: MemoryAsset[] };
 
-const getMemoryAssets = () => {
+const getMemoryAssets = async () => {
     if (!globalForAssets.__memoryAssets) {
+        const { assets: seedAssets } = await import("@/lib/store");
         globalForAssets.__memoryAssets = seedAssets.map((asset) => ({
             ...asset,
             _id: asset.id,
@@ -26,7 +37,11 @@ export async function GET() {
         const assets = await Asset.find({});
         return NextResponse.json(assets);
     } catch {
-        return NextResponse.json(getMemoryAssets());
+        if (isProduction) {
+            return NextResponse.json([]);
+        }
+        const assets = await getMemoryAssets();
+        return NextResponse.json(assets);
     }
 }
 
@@ -43,8 +58,11 @@ export async function POST(request: Request) {
         });
         return NextResponse.json(asset, { status: 201 });
     } catch {
+        if (isProduction) {
+            return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+        }
         const memoryAsset = { _id: createMemoryId(), ...body } as MemoryAsset;
-        const assets = getMemoryAssets();
+        const assets = await getMemoryAssets();
         assets.push(memoryAsset);
         await logActivity({
             action: "CREATE",

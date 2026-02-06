@@ -1,15 +1,26 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Expense from '@/models/Expense';
-import { budget } from "@/lib/store";
 import { logActivity } from '@/lib/activity';
 
-type MemoryExpense = (typeof budget.monthlyCosts)[number] & { _id: string };
+type MemoryExpense = {
+    _id: string;
+    id?: string;
+    name: string;
+    category: string;
+    amount: number;
+    status: string;
+    billingDate?: string;
+    note?: string;
+};
+
+const isProduction = process.env.VERCEL_ENV === "production";
 
 const globalForExpenses = globalThis as unknown as { __memoryExpenses?: MemoryExpense[] };
 
-const getMemoryExpenses = () => {
+const getMemoryExpenses = async () => {
     if (!globalForExpenses.__memoryExpenses) {
+        const { budget } = await import("@/lib/store");
         globalForExpenses.__memoryExpenses = budget.monthlyCosts.map((expense) => ({
             ...expense,
             _id: expense.id,
@@ -26,7 +37,11 @@ export async function GET() {
         const expenses = await Expense.find({});
         return NextResponse.json(expenses);
     } catch {
-        return NextResponse.json(getMemoryExpenses());
+        if (isProduction) {
+            return NextResponse.json([]);
+        }
+        const expenses = await getMemoryExpenses();
+        return NextResponse.json(expenses);
     }
 }
 
@@ -43,8 +58,11 @@ export async function POST(request: Request) {
         });
         return NextResponse.json(expense, { status: 201 });
     } catch {
+        if (isProduction) {
+            return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+        }
         const memoryExpense = { _id: createMemoryId(), ...body } as MemoryExpense;
-        const expenses = getMemoryExpenses();
+        const expenses = await getMemoryExpenses();
         expenses.push(memoryExpense);
         await logActivity({
             action: "CREATE",

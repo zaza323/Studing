@@ -2,14 +2,24 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Milestone from '@/models/Milestone';
 import { logActivity } from '@/lib/activity';
-import { milestones as seedMilestones } from "@/lib/store";
+type MemoryMilestone = {
+    _id: string;
+    id?: string;
+    phase: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    isComplete: boolean;
+    isCurrent: boolean;
+};
 
-type MemoryMilestone = (typeof seedMilestones)[number] & { _id: string };
+const isProduction = process.env.VERCEL_ENV === "production";
 
 const globalForMilestones = globalThis as unknown as { __memoryMilestones?: MemoryMilestone[] };
 
-const getMemoryMilestones = () => {
+const getMemoryMilestones = async () => {
     if (!globalForMilestones.__memoryMilestones) {
+        const { milestones: seedMilestones } = await import("@/lib/store");
         globalForMilestones.__memoryMilestones = seedMilestones.map((milestone) => ({
             ...milestone,
             _id: milestone.id,
@@ -26,7 +36,10 @@ export async function GET() {
         const milestones = await Milestone.find({}).sort({ startDate: 1 });
         return NextResponse.json(milestones);
     } catch {
-        const milestones = getMemoryMilestones();
+        if (isProduction) {
+            return NextResponse.json([]);
+        }
+        const milestones = await getMemoryMilestones();
         const sorted = [...milestones].sort((a, b) => a.startDate.localeCompare(b.startDate));
         return NextResponse.json(sorted);
     }
@@ -45,8 +58,11 @@ export async function POST(request: Request) {
         });
         return NextResponse.json(milestone, { status: 201 });
     } catch {
+        if (isProduction) {
+            return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+        }
         const memoryMilestone = { _id: createMemoryId(), ...body } as MemoryMilestone;
-        const milestones = getMemoryMilestones();
+        const milestones = await getMemoryMilestones();
         milestones.push(memoryMilestone);
         await logActivity({
             action: "CREATE",

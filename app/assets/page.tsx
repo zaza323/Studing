@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense, type ElementType, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
-import { teamMembers } from "@/lib/store";
 import type { Asset as BaseAsset, AssetStatus, AssetCategory } from "@/lib/store";
 import { Package, Plus, Trash2, X, FolderOpen, CircuitBoard, FileCheck, Truck, DollarSign, Pencil, Loader2 } from "lucide-react";
 
@@ -14,12 +13,14 @@ interface Asset extends Omit<BaseAsset, "id"> {
 
 function AssetsContent() {
     const searchParams = useSearchParams();
+    const isProduction = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
     const [assets, setAssets] = useState<Asset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<AssetCategory | "All">("All");
     const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
+    const [ownerOptions, setOwnerOptions] = useState<string[]>([]);
     const categoryLabels: Record<AssetCategory, string> = {
         Production: "إنتاج وتصوير",
         Infrastructure: "بنية تحتية",
@@ -32,6 +33,25 @@ function AssetsContent() {
     useEffect(() => {
         fetchAssets();
     }, []);
+
+    useEffect(() => {
+        const owners = Array.from(new Set(assets.map((asset) => asset.owner).filter(Boolean)));
+        setOwnerOptions(owners);
+    }, [assets]);
+
+    useEffect(() => {
+        if (isProduction) {
+            return;
+        }
+        import("@/lib/store")
+            .then(({ teamMembers }) => {
+                setOwnerOptions((prev) => {
+                    const names = teamMembers.map((member) => member.name);
+                    return Array.from(new Set([...prev, ...names]));
+                });
+            })
+            .catch(() => {});
+    }, [isProduction]);
 
     const fetchAssets = async () => {
         setIsLoading(true);
@@ -337,6 +357,7 @@ function AssetsContent() {
                     onClose={() => setIsAddModalOpen(false)}
                     onSave={handleAddAsset}
                     title="إضافة أصل جديد"
+                    ownerOptions={ownerOptions}
                 />
             )}
 
@@ -347,6 +368,7 @@ function AssetsContent() {
                     onSave={handleUpdateAsset}
                     initialData={editingAsset}
                     title="تعديل الأصل"
+                    ownerOptions={ownerOptions}
                 />
             )}
         </div>
@@ -485,21 +507,25 @@ function AssetModal({
     onClose,
     onSave,
     initialData,
-    title
+    title,
+    ownerOptions
 }: {
     onClose: () => void,
     onSave: (item: Omit<Asset, "_id" | "id">) => void,
     initialData?: Asset,
-    title: string
+    title: string,
+    ownerOptions: string[]
 }) {
-    const ownerOptions = teamMembers.map((member) => member.name);
+    const mergedOwnerOptions = initialData?.owner
+        ? Array.from(new Set([initialData.owner, ...ownerOptions]))
+        : ownerOptions;
     const [formData, setFormData] = useState({
         name: initialData?.name || "",
         category: initialData?.category || "Production" as AssetCategory,
         price: initialData?.price?.toString() || "",
-        owner: (initialData?.owner && ownerOptions.includes(initialData.owner))
+        owner: (initialData?.owner && mergedOwnerOptions.includes(initialData.owner))
             ? initialData.owner
-            : ownerOptions[0] ?? "",
+            : mergedOwnerOptions[0] ?? "",
         status: initialData?.status || "للشراء" as AssetStatus,
         note: initialData?.note || ""
     });
@@ -572,17 +598,27 @@ function AssetModal({
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">المالك / المسؤول</label>
-                            <select
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                value={formData.owner}
-                                onChange={e => setFormData({ ...formData, owner: e.target.value })}
-                            >
-                                {ownerOptions.map((owner) => (
-                                    <option key={owner} value={owner}>
-                                        {owner}
-                                    </option>
-                                ))}
-                            </select>
+                            {mergedOwnerOptions.length > 0 ? (
+                                <select
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={formData.owner}
+                                    onChange={e => setFormData({ ...formData, owner: e.target.value })}
+                                >
+                                    {mergedOwnerOptions.map((owner) => (
+                                        <option key={owner} value={owner}>
+                                            {owner}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
+                                    type="text"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                    value={formData.owner}
+                                    onChange={e => setFormData({ ...formData, owner: e.target.value })}
+                                    placeholder="اسم المالك"
+                                />
+                            )}
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">الحالة</label>

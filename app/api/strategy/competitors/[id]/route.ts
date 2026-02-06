@@ -1,15 +1,28 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import { Competitor } from "@/models/Strategy";
-import { initialCompetitors } from "@/lib/store";
 import { logActivity } from "@/lib/activity";
 
-type MemoryCompetitor = (typeof initialCompetitors)[number] & { _id: string };
+type MemoryCompetitor = {
+    _id: string;
+    id?: string;
+    name: string;
+    logo: string;
+    logoUrl?: string;
+    strengths: string[];
+    weaknesses: string[];
+    url: string;
+    richNotes?: string;
+    images?: string[];
+};
+
+const isProduction = process.env.VERCEL_ENV === "production";
 
 const globalForCompetitors = globalThis as unknown as { __memoryCompetitors?: MemoryCompetitor[] };
 
-const getMemoryCompetitors = () => {
+const getMemoryCompetitors = async () => {
     if (!globalForCompetitors.__memoryCompetitors) {
+        const { initialCompetitors } = await import("@/lib/store");
         globalForCompetitors.__memoryCompetitors = initialCompetitors.map((competitor) => ({
             ...competitor,
             _id: competitor.id,
@@ -46,7 +59,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         });
         return NextResponse.json(competitor);
     } catch {
-        const competitors = getMemoryCompetitors();
+        if (isProduction) {
+            return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+        }
+        const competitors = await getMemoryCompetitors();
         const index = competitors.findIndex((c) => c._id === id || c.id === id);
         if (index === -1) {
             return NextResponse.json({ error: "Competitor not found" }, { status: 404 });
@@ -81,7 +97,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         });
         return NextResponse.json({ message: "Competitor deleted successfully" });
     } catch {
-        const competitors = getMemoryCompetitors();
+        if (isProduction) {
+            return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+        }
+        const competitors = await getMemoryCompetitors();
         const index = competitors.findIndex((c) => c._id === id || c.id === id);
         if (index === -1) {
             return NextResponse.json({ error: "Competitor not found" }, { status: 404 });

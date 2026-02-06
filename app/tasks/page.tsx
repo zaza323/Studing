@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { teamMembers, getTeamMemberById } from "@/lib/store";
 import type { Task as BaseTask, TaskStatus, Priority } from "@/lib/store";
 import { Filter, Plus, Trash2, X, Loader2 } from "lucide-react";
 
@@ -11,16 +10,59 @@ interface Task extends Omit<BaseTask, "id"> {
     id?: string;
 }
 
+type AssigneeInfo = {
+    name: string;
+    avatar?: string;
+};
+
 export default function TasksPage() {
+    const isProduction = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState<string>("all");
     const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false);
+    const [assigneeOptions, setAssigneeOptions] = useState<string[]>([]);
+    const [assigneeLookup, setAssigneeLookup] = useState<Record<string, AssigneeInfo>>({});
 
     // Fetch Tasks
     useEffect(() => {
         fetchTasks();
     }, []);
+
+    useEffect(() => {
+        const uniqueAssignees = Array.from(new Set(tasks.map((task) => task.assignee).filter(Boolean)));
+        setAssigneeOptions(uniqueAssignees);
+        setAssigneeLookup((prev) => {
+            const next = { ...prev };
+            uniqueAssignees.forEach((assignee) => {
+                if (!next[assignee]) {
+                    next[assignee] = { name: assignee };
+                }
+            });
+            return next;
+        });
+    }, [tasks]);
+
+    useEffect(() => {
+        if (isProduction) {
+            return;
+        }
+        import("@/lib/store")
+            .then(({ teamMembers }) => {
+                setAssigneeLookup((prev) => {
+                    const next = { ...prev };
+                    teamMembers.forEach((member) => {
+                        next[member.id] = { name: member.name, avatar: member.avatar };
+                    });
+                    return next;
+                });
+                setAssigneeOptions((prev) => {
+                    const memberIds = teamMembers.map((member) => member.id);
+                    return Array.from(new Set([...prev, ...memberIds]));
+                });
+            })
+            .catch(() => {});
+    }, [isProduction]);
 
     const fetchTasks = async () => {
         setIsLoading(true);
@@ -130,9 +172,9 @@ export default function TasksPage() {
                         className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     >
                         <option value="all">جميع الأعضاء</option>
-                        {teamMembers.map((member) => (
-                            <option key={member.id} value={member.id}>
-                                {member.name}
+                        {assigneeOptions.map((assignee) => (
+                            <option key={assignee} value={assignee}>
+                                {assigneeLookup[assignee]?.name ?? assignee}
                             </option>
                         ))}
                     </select>
@@ -158,6 +200,7 @@ export default function TasksPage() {
                         count={statusTasks.length}
                         onDeleteTask={handleDeleteTask}
                         onUpdateTaskStatus={handleUpdateTaskStatus}
+                        assigneeLookup={assigneeLookup}
                     />
                 ))}
             </div>
@@ -167,6 +210,8 @@ export default function TasksPage() {
                 <NewTaskDialog
                     onClose={() => setIsNewTaskDialogOpen(false)}
                     onCreate={handleCreateTask}
+                    assigneeOptions={assigneeOptions}
+                    assigneeLookup={assigneeLookup}
                 />
             )}
         </div>
@@ -180,12 +225,14 @@ function TaskColumn({
     count,
     onDeleteTask,
     onUpdateTaskStatus,
+    assigneeLookup,
 }: {
     title: TaskStatus;
     tasks: Task[];
     count: number;
     onDeleteTask: (taskId: string) => void;
     onUpdateTaskStatus: (taskId: string, newStatus: TaskStatus) => void;
+    assigneeLookup: Record<string, AssigneeInfo>;
 }) {
     const statusColors = {
         "قيد الانتظار": "bg-gray-100 border-gray-300",
@@ -213,6 +260,7 @@ function TaskColumn({
                         task={task}
                         onDelete={onDeleteTask}
                         onUpdateStatus={onUpdateTaskStatus}
+                        assigneeLookup={assigneeLookup}
                     />
                 ))}
             </div>
@@ -225,12 +273,14 @@ function TaskCard({
     task,
     onDelete,
     onUpdateStatus,
+    assigneeLookup,
 }: {
     task: Task;
     onDelete: (taskId: string) => void;
     onUpdateStatus: (taskId: string, newStatus: TaskStatus) => void;
+    assigneeLookup: Record<string, AssigneeInfo>;
 }) {
-    const assignee = getTeamMemberById(task.assignee);
+    const assignee = assigneeLookup[task.assignee];
     const [showStatusMenu, setShowStatusMenu] = useState(false);
 
     const priorityStyles = {
@@ -261,7 +311,7 @@ function TaskCard({
                     <div className="flex items-center gap-2">
                         <div
                             className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium"
-                            style={{ backgroundColor: assignee.avatar }}
+                            style={{ backgroundColor: assignee.avatar ?? "#9ca3af" }}
                         >
                             {assignee.name.charAt(0)}
                         </div>
@@ -317,16 +367,21 @@ function TaskCard({
 function NewTaskDialog({
     onClose,
     onCreate,
+    assigneeOptions,
+    assigneeLookup,
 }: {
     onClose: () => void;
     onCreate: (task: Omit<Task, "_id" | "id">) => void;
+    assigneeOptions: string[];
+    assigneeLookup: Record<string, AssigneeInfo>;
 }) {
     const [formData, setFormData] = useState({
         title: "",
         description: "",
-        assignee: teamMembers[0]?.id || "",
+        assignee: assigneeOptions[0] ?? "",
         priority: "متوسطة" as Priority,
     });
+    const effectiveAssignee = formData.assignee || assigneeOptions[0] || "";
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -338,6 +393,7 @@ function NewTaskDialog({
 
         onCreate({
             ...formData,
+            assignee: effectiveAssignee,
             status: "قيد الانتظار",
         });
     };
@@ -396,19 +452,31 @@ function NewTaskDialog({
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             المكلف بالمهمة
                         </label>
-                        <select
-                            value={formData.assignee}
-                            onChange={(e) =>
-                                setFormData({ ...formData, assignee: e.target.value })
-                            }
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        >
-                            {teamMembers.map((member) => (
-                                <option key={member.id} value={member.id}>
-                                    {member.name} - {member.role}
-                                </option>
-                            ))}
-                        </select>
+                        {assigneeOptions.length > 0 ? (
+                            <select
+                                value={effectiveAssignee}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, assignee: e.target.value })
+                                }
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            >
+                                {assigneeOptions.map((assignee) => (
+                                    <option key={assignee} value={assignee}>
+                                        {assigneeLookup[assignee]?.name ?? assignee}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <input
+                                type="text"
+                                value={formData.assignee}
+                                onChange={(e) =>
+                                    setFormData({ ...formData, assignee: e.target.value })
+                                }
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                placeholder="اسم المكلف"
+                            />
+                        )}
                     </div>
 
                     {/* Priority */}

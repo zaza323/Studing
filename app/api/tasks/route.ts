@@ -2,14 +2,23 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Task from '@/models/Task';
 import { logActivity } from '@/lib/activity';
-import { tasks as seedTasks } from "@/lib/store";
+type MemoryTask = {
+    _id: string;
+    id?: string;
+    title: string;
+    description: string;
+    status: string;
+    assignee: string;
+    priority: string;
+};
 
-type MemoryTask = (typeof seedTasks)[number] & { _id: string };
+const isProduction = process.env.VERCEL_ENV === "production";
 
 const globalForTasks = globalThis as unknown as { __memoryTasks?: MemoryTask[] };
 
-const getMemoryTasks = () => {
+const getMemoryTasks = async () => {
     if (!globalForTasks.__memoryTasks) {
+        const { tasks: seedTasks } = await import("@/lib/store");
         globalForTasks.__memoryTasks = seedTasks.map((task) => ({
             ...task,
             _id: task.id,
@@ -75,7 +84,11 @@ export async function GET(request: Request) {
         if (shouldMigrate) {
             return NextResponse.json({ error: "Failed to migrate tasks" }, { status: 500 });
         }
-        return NextResponse.json(getMemoryTasks());
+        if (isProduction) {
+            return NextResponse.json([]);
+        }
+        const tasks = await getMemoryTasks();
+        return NextResponse.json(tasks);
     }
 }
 
@@ -92,8 +105,11 @@ export async function POST(request: Request) {
         });
         return NextResponse.json(task, { status: 201 });
     } catch {
+        if (isProduction) {
+            return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+        }
         const memoryTask = { _id: createMemoryId(), ...body } as MemoryTask;
-        const tasks = getMemoryTasks();
+        const tasks = await getMemoryTasks();
         tasks.push(memoryTask);
         await logActivity({
             action: "CREATE",

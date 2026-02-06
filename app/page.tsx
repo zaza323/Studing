@@ -14,16 +14,27 @@ import {
   Loader2,
   Pencil
 } from "lucide-react";
-import { budget, defaultLaunchDate, getDaysUntilLaunch } from "@/lib/store";
 import type { Asset, Task } from "@/lib/store";
+
+const getTodayDateInput = () => new Date().toISOString().slice(0, 10);
+
+const getDaysUntilLaunch = (launchDateString: string, now: Date) => {
+  const launchDate = new Date(launchDateString);
+  if (Number.isNaN(launchDate.getTime())) {
+    return 0;
+  }
+  const diffTime = launchDate.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > 0 ? diffDays : 0;
+};
 
 export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
-  const [launchDate, setLaunchDate] = useState(defaultLaunchDate);
+  const [launchDate, setLaunchDate] = useState(getTodayDateInput);
   const [now, setNow] = useState(() => new Date());
-  const [totalBudget, setTotalBudget] = useState(budget.totalBudget);
+  const [totalBudget, setTotalBudget] = useState(0);
   const [isEditingBudget, setIsEditingBudget] = useState(false);
-  const [newBudgetValue, setNewBudgetValue] = useState(budget.totalBudget);
+  const [newBudgetValue, setNewBudgetValue] = useState(0);
   const [stats, setStats] = useState({
     budgetSpent: 0,
     activeTasks: 0,
@@ -32,9 +43,12 @@ export default function Home() {
   });
 
   useEffect(() => {
+    let hasStoredLaunchDate = false;
+    let hasStoredBudget = false;
     const storedLaunchDate = localStorage.getItem("launchDate");
     if (storedLaunchDate) {
       setLaunchDate(storedLaunchDate);
+      hasStoredLaunchDate = true;
     }
     const storedTotalBudget = localStorage.getItem("totalBudget");
     if (storedTotalBudget) {
@@ -42,8 +56,23 @@ export default function Home() {
       if (!Number.isNaN(parsedBudget)) {
         setTotalBudget(parsedBudget);
         setNewBudgetValue(parsedBudget);
+        hasStoredBudget = true;
       }
     }
+    if (process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production") {
+      return;
+    }
+    import("@/lib/store")
+      .then(({ budget, defaultLaunchDate }) => {
+        if (!hasStoredLaunchDate) {
+          setLaunchDate(defaultLaunchDate);
+        }
+        if (!hasStoredBudget) {
+          setTotalBudget(budget.totalBudget);
+          setNewBudgetValue(budget.totalBudget);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {

@@ -1,15 +1,25 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import { Idea } from "@/models/Strategy";
-import { initialIdeas } from "@/lib/store";
 import { logActivity } from "@/lib/activity";
 
-type MemoryIdea = (typeof initialIdeas)[number] & { _id: string };
+type MemoryIdea = {
+    _id: string;
+    id?: string;
+    title: string;
+    content: string;
+    category: string;
+    color: string;
+    createdAt: string;
+};
+
+const isProduction = process.env.VERCEL_ENV === "production";
 
 const globalForIdeas = globalThis as unknown as { __memoryIdeas?: MemoryIdea[] };
 
-const getMemoryIdeas = () => {
+const getMemoryIdeas = async () => {
     if (!globalForIdeas.__memoryIdeas) {
+        const { initialIdeas } = await import("@/lib/store");
         globalForIdeas.__memoryIdeas = initialIdeas.map((idea) => ({
             ...idea,
             _id: idea.id,
@@ -37,7 +47,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         });
         return NextResponse.json(idea);
     } catch {
-        const ideas = getMemoryIdeas();
+        if (isProduction) {
+            return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+        }
+        const ideas = await getMemoryIdeas();
         const index = ideas.findIndex((i) => i._id === id || i.id === id);
         if (index === -1) {
             return NextResponse.json({ error: "Idea not found" }, { status: 404 });
@@ -72,7 +85,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         });
         return NextResponse.json({ message: "Idea deleted successfully" });
     } catch {
-        const ideas = getMemoryIdeas();
+        if (isProduction) {
+            return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+        }
+        const ideas = await getMemoryIdeas();
         const index = ideas.findIndex((i) => i._id === id || i.id === id);
         if (index === -1) {
             return NextResponse.json({ error: "Idea not found" }, { status: 404 });

@@ -1,15 +1,25 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { Idea } from '@/models/Strategy';
-import { initialIdeas } from "@/lib/store";
 import { logActivity } from "@/lib/activity";
 
-type MemoryIdea = (typeof initialIdeas)[number] & { _id: string };
+type MemoryIdea = {
+    _id: string;
+    id?: string;
+    title: string;
+    content: string;
+    category: string;
+    color: string;
+    createdAt: string;
+};
+
+const isProduction = process.env.VERCEL_ENV === "production";
 
 const globalForIdeas = globalThis as unknown as { __memoryIdeas?: MemoryIdea[] };
 
-const getMemoryIdeas = () => {
+const getMemoryIdeas = async () => {
     if (!globalForIdeas.__memoryIdeas) {
+        const { initialIdeas } = await import("@/lib/store");
         globalForIdeas.__memoryIdeas = initialIdeas.map((idea) => ({
             ...idea,
             _id: idea.id,
@@ -26,7 +36,11 @@ export async function GET() {
         const ideas = await Idea.find({});
         return NextResponse.json(ideas);
     } catch {
-        return NextResponse.json(getMemoryIdeas());
+        if (isProduction) {
+            return NextResponse.json([]);
+        }
+        const ideas = await getMemoryIdeas();
+        return NextResponse.json(ideas);
     }
 }
 
@@ -43,12 +57,15 @@ export async function POST(request: Request) {
         });
         return NextResponse.json(idea, { status: 201 });
     } catch {
+        if (isProduction) {
+            return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
+        }
         const memoryIdea = {
             _id: createMemoryId(),
             ...body,
             createdAt: body.createdAt ?? new Date().toISOString(),
         } as MemoryIdea;
-        const ideas = getMemoryIdeas();
+        const ideas = await getMemoryIdeas();
         ideas.push(memoryIdea);
         await logActivity({
             action: "CREATE",
