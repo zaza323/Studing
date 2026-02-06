@@ -1,16 +1,14 @@
 import mongoose from 'mongoose';
 
-const isVercelProd = process.env.VERCEL_ENV === 'production';
-const MONGODB_URI = (isVercelProd ? process.env.MONGODB_URI_PROD : process.env.MONGODB_URI) ?? '';
+const getMongoUri = () => {
+    const uri = process.env.MONGODB_URI ?? '';
 
-if (!MONGODB_URI) {
-    const missing = isVercelProd ? 'MONGODB_URI_PROD' : 'MONGODB_URI';
-    throw new Error(`Please define the ${missing} environment variable.`);
-}
+    if (!uri) {
+        throw new Error('Please define the MONGODB_URI environment variable.');
+    }
 
-if (isVercelProd && process.env.MONGODB_URI && process.env.MONGODB_URI_PROD && process.env.MONGODB_URI === process.env.MONGODB_URI_PROD) {
-    throw new Error('MONGODB_URI and MONGODB_URI_PROD must point to different databases.');
-}
+    return uri;
+};
 
 type MongooseCache = {
     conn: typeof mongoose | null;
@@ -39,7 +37,8 @@ async function dbConnect() {
             serverSelectionTimeoutMS: 5000,
         };
 
-        cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
+        const uri = getMongoUri();
+        cached.promise = mongoose.connect(uri, opts).then((mongoose) => {
             return mongoose;
         });
     }
