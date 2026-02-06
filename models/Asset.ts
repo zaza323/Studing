@@ -6,6 +6,7 @@ export interface IAsset extends Document {
     price: number;
     status: string;
     owner: string;
+    note?: string;
 }
 
 const AssetSchema = new Schema<IAsset>({
@@ -18,12 +19,14 @@ const AssetSchema = new Schema<IAsset>({
     price: { type: Number, required: true },
     status: { type: String, required: true },
     owner: { type: String, default: '--' },
+    note: { type: String, default: "" },
 }, { timestamps: true });
 
 const existingModel = mongoose.models.Asset as mongoose.Model<IAsset> | undefined;
 const existingEnum = (existingModel?.schema?.path("category") as { enumValues?: string[] } | undefined)?.enumValues ?? [];
+const hasNoteField = Boolean(existingModel?.schema?.path("note"));
 
-if (existingModel && !existingEnum.includes("Furniture")) {
+if (existingModel && (!existingEnum.includes("Furniture") || !hasNoteField)) {
     delete mongoose.models.Asset;
 }
 

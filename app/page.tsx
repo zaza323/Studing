@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import MetricCard from "@/components/MetricCard";
+import ActivityFeed from "@/components/ActivityFeed";
 import {
   DollarSign,
   CheckSquare,
@@ -10,7 +11,8 @@ import {
   Package,
   Users,
   Plus,
-  Loader2
+  Loader2,
+  Pencil
 } from "lucide-react";
 import { budget, defaultLaunchDate, getDaysUntilLaunch } from "@/lib/store";
 import type { Asset, Task } from "@/lib/store";
@@ -19,6 +21,9 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
   const [launchDate, setLaunchDate] = useState(defaultLaunchDate);
   const [now, setNow] = useState(() => new Date());
+  const [totalBudget, setTotalBudget] = useState(budget.totalBudget);
+  const [isEditingBudget, setIsEditingBudget] = useState(false);
+  const [newBudgetValue, setNewBudgetValue] = useState(budget.totalBudget);
   const [stats, setStats] = useState({
     budgetSpent: 0,
     activeTasks: 0,
@@ -30,6 +35,14 @@ export default function Home() {
     const storedLaunchDate = localStorage.getItem("launchDate");
     if (storedLaunchDate) {
       setLaunchDate(storedLaunchDate);
+    }
+    const storedTotalBudget = localStorage.getItem("totalBudget");
+    if (storedTotalBudget) {
+      const parsedBudget = Number(storedTotalBudget);
+      if (!Number.isNaN(parsedBudget)) {
+        setTotalBudget(parsedBudget);
+        setNewBudgetValue(parsedBudget);
+      }
     }
   }, []);
 
@@ -73,7 +86,7 @@ export default function Home() {
     fetchData();
   }, []);
 
-  const budgetRemaining = budget.totalBudget - stats.budgetSpent;
+  const budgetRemaining = totalBudget - stats.budgetSpent;
   const daysUntilLaunch = getDaysUntilLaunch(launchDate, now);
 
   if (isLoading) {
@@ -96,13 +109,29 @@ export default function Home() {
 
       {/* Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <MetricCard
-          title="الميزانية المستخدمة"
-          value={`$${stats.budgetSpent.toLocaleString()}`}
-          subtitle={`$${budgetRemaining.toLocaleString()} متبقية`}
-          icon={DollarSign}
-          iconColor="text-emerald-600"
-        />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow relative">
+          <button
+            onClick={() => setIsEditingBudget(true)}
+            className="absolute bottom-4 left-4 p-1.5 bg-white/70 rounded-full text-gray-500 hover:text-gray-900 hover:bg-white transition-colors"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">الميزانية</p>
+              <p className="text-3xl font-bold text-gray-900 mt-2">
+                ${totalBudget.toLocaleString()}
+              </p>
+              <div className="mt-3 grid grid-cols-1 gap-1 text-sm text-gray-500">
+                <div>المستخدمة: ${stats.budgetSpent.toLocaleString()}</div>
+                <div>المتبقية: ${budgetRemaining.toLocaleString()}</div>
+              </div>
+            </div>
+            <div className="p-3 rounded-lg bg-emerald-50 text-emerald-600">
+              <DollarSign className="w-6 h-6" />
+            </div>
+          </div>
+        </div>
         <MetricCard
           title="المهام النشطة"
           value={stats.activeTasks}
@@ -162,31 +191,71 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Team Status Overview */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Users className="w-5 h-5 text-emerald-600" />
-          <h2 className="text-xl font-bold text-gray-900">حالة المشروع</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-xl font-bold text-gray-900">حالة المشروع</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatusItem
+              label="ميزانية المعدات"
+              percentage={totalBudget > 0 ? Math.round((stats.budgetSpent / totalBudget) * 100) : 0}
+              color="emerald"
+            />
+            <StatusItem
+              label="المهام المكتملة"
+              percentage={stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0}
+              color="blue"
+            />
+            <StatusItem
+              label="تقدم المشروع"
+              percentage={40}
+              color="purple"
+              subtitle="المرحلة 2 من 3"
+            />
+          </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatusItem
-            label="ميزانية المعدات"
-            percentage={Math.round((stats.budgetSpent / budget.totalBudget) * 100)}
-            color="emerald"
-          />
-          <StatusItem
-            label="المهام المكتملة"
-            percentage={stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0}
-            color="blue"
-          />
-          <StatusItem
-            label="تقدم المشروع"
-            percentage={40}
-            color="purple"
-            subtitle="المرحلة 2 من 3"
-          />
-        </div>
+        <ActivityFeed />
       </div>
+
+      {isEditingBudget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-sm">
+            <h3 className="text-lg font-bold text-gray-900 mb-4">تعديل الميزانية</h3>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={newBudgetValue}
+              onChange={(e) => setNewBudgetValue(Number(e.target.value) || 0)}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4"
+              placeholder="أدخل الميزانية الجديدة"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setIsEditingBudget(false);
+                  setNewBudgetValue(totalBudget);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-100 text-gray-900 rounded-lg hover:bg-gray-200"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={() => {
+                  setTotalBudget(newBudgetValue);
+                  localStorage.setItem("totalBudget", String(newBudgetValue));
+                  setIsEditingBudget(false);
+                }}
+                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+              >
+                حفظ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

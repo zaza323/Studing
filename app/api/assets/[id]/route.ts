@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Asset from '@/models/Asset';
+import { logActivity } from '@/lib/activity';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
@@ -13,6 +14,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
         }
 
+        await logActivity({
+            action: "UPDATE",
+            entity: "Asset",
+            description: `تم تحديث أصل: ${asset.name}`,
+            user: "System",
+        });
         return NextResponse.json(asset);
     } catch {
         return NextResponse.json({ error: 'Failed to update asset' }, { status: 400 });
@@ -29,6 +36,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
         }
 
+        await logActivity({
+            action: "DELETE",
+            entity: "Asset",
+            description: `تم حذف أصل: ${asset.name}`,
+            user: "System",
+        });
         return NextResponse.json({ message: 'Asset deleted successfully' });
     } catch {
         return NextResponse.json({ error: 'Failed to delete asset' }, { status: 400 });

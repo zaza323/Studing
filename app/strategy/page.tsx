@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, type ElementType, type ReactNode } from "react";
+import Image from "next/image";
 import type { Idea as BaseIdea, Competitor as BaseCompetitor } from "@/lib/store";
 import { Plus, Trash2, ExternalLink, Lightbulb, Target, X, Edit2, Check, GripVertical, Loader2 } from "lucide-react";
 import {
@@ -45,7 +46,7 @@ export default function StrategyPage() {
 
     // Modal State
     const [ideaModal, setIdeaModal] = useState<{ isOpen: boolean, editingId: string | null }>({ isOpen: false, editingId: null });
-    const [competitorModal, setCompetitorModal] = useState<{ isOpen: boolean, editingId: string | null }>({ isOpen: false, editingId: null });
+    const [competitorModal, setCompetitorModal] = useState<{ isOpen: boolean, editingId: string | null, startInEdit: boolean }>({ isOpen: false, editingId: null, startInEdit: false });
 
     // Fetch Data
     useEffect(() => {
@@ -186,7 +187,7 @@ export default function StrategyPage() {
                     setCompetitors([...competitors, saved]);
                 }
             }
-            setCompetitorModal({ isOpen: false, editingId: null });
+            setCompetitorModal({ isOpen: false, editingId: null, startInEdit: false });
         } catch (error) {
             console.error("Failed to save competitor", error);
         }
@@ -298,7 +299,7 @@ export default function StrategyPage() {
                                 <p className="text-sm text-gray-500">تحليل نقاط القوة والضعف للمنافسين (اسحب لإعادة الترتيب)</p>
                             </div>
                             <button
-                                onClick={() => setCompetitorModal({ isOpen: true, editingId: null })}
+                                onClick={() => setCompetitorModal({ isOpen: true, editingId: null, startInEdit: true })}
                                 className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all"
                             >
                                 <Plus className="w-5 h-5" /> منافس جديد
@@ -319,7 +320,8 @@ export default function StrategyPage() {
                                         <SortableCompetitorCard
                                             key={comp._id}
                                             comp={comp}
-                                            onEdit={(id) => setCompetitorModal({ isOpen: true, editingId: id })}
+                                            onOpen={(id) => setCompetitorModal({ isOpen: true, editingId: id, startInEdit: false })}
+                                            onEdit={(id) => setCompetitorModal({ isOpen: true, editingId: id, startInEdit: true })}
                                             onDelete={handleDeleteCompetitor}
                                         />
                                     ))}
@@ -351,9 +353,10 @@ export default function StrategyPage() {
 
             {competitorModal.isOpen && (
                 <CompetitorDialog
-                    onClose={() => setCompetitorModal({ isOpen: false, editingId: null })}
+                    onClose={() => setCompetitorModal({ isOpen: false, editingId: null, startInEdit: false })}
                     onSave={handleSaveCompetitor}
                     editingComp={competitors.find(c => c._id === competitorModal.editingId)}
+                    startInEdit={competitorModal.startInEdit}
                 />
             )}
         </div>
@@ -432,7 +435,7 @@ function SortableIdeaCard({ idea, onEdit, onDelete }: { idea: Idea, onEdit: (id:
     );
 }
 
-function SortableCompetitorCard({ comp, onEdit, onDelete }: { comp: Competitor, onEdit: (id: string) => void, onDelete: (id: string) => void }) {
+function SortableCompetitorCard({ comp, onOpen, onEdit, onDelete }: { comp: Competitor, onOpen: (id: string) => void, onEdit: (id: string) => void, onDelete: (id: string) => void }) {
     const {
         attributes,
         listeners,
@@ -441,6 +444,8 @@ function SortableCompetitorCard({ comp, onEdit, onDelete }: { comp: Competitor, 
         transition,
         isDragging
     } = useSortable({ id: comp._id });
+    const logoUrl = comp.logoUrl?.trim() ?? "";
+    const hasLogoUrl = Boolean(logoUrl);
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -453,13 +458,15 @@ function SortableCompetitorCard({ comp, onEdit, onDelete }: { comp: Competitor, 
         <div
             ref={setNodeRef}
             style={style}
-            className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow relative group"
+            className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-shadow relative group cursor-pointer"
+            onClick={() => onOpen(comp._id)}
         >
             {/* Drag Handle */}
             <div
                 {...attributes}
                 {...listeners}
                 className="absolute top-4 left-4 p-1.5 cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 opacity-60 hover:opacity-100 transition-opacity"
+                onPointerDown={(e) => e.stopPropagation()}
             >
                 <GripVertical className="w-5 h-5" />
             </div>
@@ -486,18 +493,20 @@ function SortableCompetitorCard({ comp, onEdit, onDelete }: { comp: Competitor, 
 
             {/* Header */}
             <div className="flex items-center gap-4 mb-6">
-                <div className={`w-16 h-16 rounded-2xl ${comp.logo} flex items-center justify-center text-white text-2xl font-bold shadow-sm`}>
-                    {comp.name.charAt(0)}
+                <div className={`w-16 h-16 rounded-2xl ${hasLogoUrl ? "bg-white border border-gray-200" : comp.logo} flex items-center justify-center text-white text-2xl font-bold shadow-sm overflow-hidden`}>
+                    {hasLogoUrl ? (
+                        <div className="relative w-full h-full">
+                            <Image src={logoUrl} alt={comp.name} fill className="object-contain" unoptimized loader={() => logoUrl} />
+                        </div>
+                    ) : (
+                        comp.name.charAt(0)
+                    )}
                 </div>
                 <div>
                     <h3 className="text-xl font-bold text-gray-900">{comp.name}</h3>
                     <a href={`https://${comp.url}`} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:underline flex items-center gap-1">
                         {comp.url} <ExternalLink className="w-3 h-3" />
                     </a>
-                </div>
-                <div className="mr-auto text-center">
-                    <span className="block text-2xl font-bold text-gray-800">{comp.pricePoint}</span>
-                    <span className="text-xs text-gray-500 uppercase font-bold">السعر</span>
                 </div>
             </div>
 
@@ -544,11 +553,13 @@ type IdeaFormPayload = {
 
 type CompetitorFormPayload = {
     name: string;
-    pricePoint: string;
     url: string;
     logo: string;
+    logoUrl: string;
     strengths: string[];
     weaknesses: string[];
+    richNotes: string;
+    images: string[];
 };
 
 type IdeaDialogProps = {
@@ -563,6 +574,7 @@ type CompetitorDialogProps = {
     onClose: () => void;
     onSave: (payload: CompetitorFormPayload) => void;
     editingComp?: Competitor;
+    startInEdit: boolean;
 };
 
 type ModalLayoutProps = {
@@ -682,11 +694,15 @@ function IdeaDialog({ onClose, onSave, editingIdea, availableCategories, onAddCa
     );
 }
 
-function CompetitorDialog({ onClose, onSave, editingComp }: CompetitorDialogProps) {
+function CompetitorDialog({ onClose, onSave, editingComp, startInEdit }: CompetitorDialogProps) {
     const [name, setName] = useState(editingComp?.name || "");
-    const [pricePoint, setPricePoint] = useState(editingComp?.pricePoint || "$$");
     const [url, setUrl] = useState(editingComp?.url || "");
     const [color, setColor] = useState(editingComp?.logo || "bg-indigo-500");
+    const [logoUrl, setLogoUrl] = useState(editingComp?.logoUrl || "");
+    const [richNotes, setRichNotes] = useState(editingComp?.richNotes || "");
+    const [images, setImages] = useState<string[]>(editingComp?.images || []);
+    const [imageInput, setImageInput] = useState("");
+    const [isEditing, setIsEditing] = useState(startInEdit || !editingComp);
 
     // Tags State
     const [strengths, setStrengths] = useState<string[]>(editingComp?.strengths || []);
@@ -700,11 +716,13 @@ function CompetitorDialog({ onClose, onSave, editingComp }: CompetitorDialogProp
         e.preventDefault();
         onSave({
             name,
-            pricePoint,
             url,
             logo: color,
+            logoUrl,
             strengths,
-            weaknesses
+            weaknesses,
+            richNotes,
+            images
         });
     };
 
@@ -718,95 +736,303 @@ function CompetitorDialog({ onClose, onSave, editingComp }: CompetitorDialogProp
         }
     };
 
+    const addImage = () => {
+        if (!imageInput.trim()) {
+            return;
+        }
+        setImages([...images, imageInput.trim()]);
+        setImageInput("");
+    };
+
+    const removeImage = (index: number) => {
+        setImages(images.filter((_, idx) => idx !== index));
+    };
+
+    const resetFields = () => {
+        setName(editingComp?.name || "");
+        setUrl(editingComp?.url || "");
+        setColor(editingComp?.logo || "bg-indigo-500");
+        setLogoUrl(editingComp?.logoUrl || "");
+        setRichNotes(editingComp?.richNotes || "");
+        setImages(editingComp?.images || []);
+        setStrengths(editingComp?.strengths || []);
+        setWeaknesses(editingComp?.weaknesses || []);
+        setSInput("");
+        setWInput("");
+        setImageInput("");
+    };
+
     return (
-        <ModalLayout title={editingComp ? "تعديل المنافس" : "إضافة منافس جديد"} onClose={onClose}>
-            <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="flex gap-4">
-                    <div className="flex-1 space-y-4">
-                        <div>
-                            <label className="label">اسم المنافس</label>
-                            <input required className="input-field" value={name} onChange={e => setName(e.target.value)} placeholder="اسم الشركة" />
-                        </div>
-                        <div>
-                            <label className="label">الموقع الإلكتروني</label>
-                            <input className="input-field" value={url} onChange={e => setUrl(e.target.value)} placeholder="example.com" />
-                        </div>
+        <DossierModalLayout
+            onClose={onClose}
+            header={(
+                <div className="flex flex-wrap items-center gap-6">
+                    <div className={`w-16 h-16 rounded-2xl ${logoUrl.trim() ? "bg-white border border-gray-200" : color} flex items-center justify-center text-white text-2xl font-bold shadow-sm overflow-hidden`}>
+                        {logoUrl.trim() ? (
+                            <div className="relative w-full h-full">
+                                <Image src={logoUrl} alt={name || "logo"} fill className="object-contain" unoptimized loader={() => logoUrl} />
+                            </div>
+                        ) : (
+                            name.trim() ? name.trim().charAt(0) : "?"
+                        )}
                     </div>
-                    <div>
-                        <label className="label mb-2 block text-center">لون الشعار</label>
-                        <div className="grid grid-cols-2 gap-2">
-                            {bgColors.map(c => (
-                                <button
-                                    type="button"
-                                    key={c}
-                                    onClick={() => setColor(c)}
-                                    className={`w-8 h-8 rounded-full ${c} ${color === c ? 'ring-2 ring-offset-2 ring-gray-400' : ''}`}
+                    <div className="space-y-1 min-w-[200px]">
+                        {isEditing ? (
+                            <input
+                                required
+                                className="w-full text-2xl font-bold text-gray-900 border-b border-gray-200 focus:outline-none focus:border-indigo-500"
+                                value={name}
+                                onChange={e => setName(e.target.value)}
+                                placeholder="اسم المنافس"
+                            />
+                        ) : (
+                            <h3 className="text-2xl font-bold text-gray-900">{name}</h3>
+                        )}
+                        {isEditing ? (
+                            <input
+                                dir="ltr"
+                                className="w-full text-sm text-gray-600 border-b border-gray-200 focus:outline-none focus:border-indigo-500"
+                                value={url}
+                                onChange={e => setUrl(e.target.value)}
+                                placeholder="example.com"
+                            />
+                        ) : (
+                            <a href={`https://${url}`} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:underline flex items-center gap-1">
+                                {url} <ExternalLink className="w-3 h-3" />
+                            </a>
+                        )}
+                    </div>
+                </div>
+            )}
+            actions={(
+                <div className="flex items-center gap-2">
+                    {!isEditing && (
+                        <button
+                            onClick={() => setIsEditing(true)}
+                            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                        >
+                            تعديل
+                        </button>
+                    )}
+                    {isEditing && editingComp && (
+                        <button
+                            onClick={() => {
+                                resetFields();
+                                setIsEditing(false);
+                            }}
+                            className="px-4 py-2 text-sm font-semibold rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        >
+                            إلغاء التعديل
+                        </button>
+                    )}
+                </div>
+            )}
+        >
+            <form onSubmit={handleSubmit} className="space-y-8">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6">
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="bg-green-50/60 p-5 rounded-2xl border border-green-100">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className="font-bold text-green-700 text-sm uppercase flex items-center gap-2">
+                                        <Check className="w-4 h-4" /> نقاط القوة
+                                    </h4>
+                                </div>
+                                {isEditing && (
+                                    <div className="flex gap-2 mb-3">
+                                        <input
+                                            className="flex-1 px-3 py-2 border border-green-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                                            placeholder="اكتب واضغط Enter..."
+                                            value={sInput}
+                                            onChange={e => setSInput(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag('s'))}
+                                        />
+                                        <button type="button" onClick={() => addTag('s')} className="px-3 bg-green-100 text-green-700 rounded-lg text-lg hover:bg-green-200">+</button>
+                                    </div>
+                                )}
+                                <div className="flex flex-wrap gap-2">
+                                    {strengths.length === 0 && (
+                                        <span className="text-sm text-green-700/70">لا توجد نقاط قوة بعد</span>
+                                    )}
+                                    {strengths.map((s, i) => (
+                                        <span key={i} className="bg-white text-green-800 text-sm px-2.5 py-1.5 rounded-lg border border-green-200 flex items-center gap-1 font-semibold">
+                                            {s}
+                                            {isEditing && (
+                                                <button type="button" onClick={() => setStrengths(strengths.filter((_, idx) => idx !== i))} className="hover:text-red-500">×</button>
+                                            )}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="bg-red-50/60 p-5 rounded-2xl border border-red-100">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className="font-bold text-red-700 text-sm uppercase flex items-center gap-2">
+                                        <X className="w-4 h-4" /> نقاط الضعف
+                                    </h4>
+                                </div>
+                                {isEditing && (
+                                    <div className="flex gap-2 mb-3">
+                                        <input
+                                            className="flex-1 px-3 py-2 border border-red-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                                            placeholder="اكتب واضغط Enter..."
+                                            value={wInput}
+                                            onChange={e => setWInput(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag('w'))}
+                                        />
+                                        <button type="button" onClick={() => addTag('w')} className="px-3 bg-red-100 text-red-700 rounded-lg text-lg hover:bg-red-200">+</button>
+                                    </div>
+                                )}
+                                <div className="flex flex-wrap gap-2">
+                                    {weaknesses.length === 0 && (
+                                        <span className="text-sm text-red-700/70">لا توجد نقاط ضعف بعد</span>
+                                    )}
+                                    {weaknesses.map((w, i) => (
+                                        <span key={i} className="bg-white text-red-800 text-sm px-2.5 py-1.5 rounded-lg border border-red-200 flex items-center gap-1 font-semibold">
+                                            {w}
+                                            {isEditing && (
+                                                <button type="button" onClick={() => setWeaknesses(weaknesses.filter((_, idx) => idx !== i))} className="hover:text-red-500">×</button>
+                                            )}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 p-6 rounded-2xl border border-gray-200">
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="font-bold text-gray-800 text-sm uppercase">دفتر الملاحظات</h4>
+                            </div>
+                            {isEditing ? (
+                                <textarea
+                                    className="w-full min-h-[220px] rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+                                    placeholder="اكتب تحليلاتك، ملاحظاتك، أفكارك..."
+                                    value={richNotes}
+                                    onChange={e => setRichNotes(e.target.value)}
                                 />
-                            ))}
+                            ) : (
+                                <div className="min-h-[220px] whitespace-pre-wrap text-sm text-gray-700">
+                                    {richNotes.trim() ? richNotes : "لا توجد ملاحظات بعد"}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="space-y-6">
+                        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                            <div className="flex items-center justify-between mb-4">
+                                <h4 className="font-bold text-gray-800 text-sm uppercase">صور وأدلة</h4>
+                            </div>
+                            {isEditing && (
+                                <div className="flex gap-2 mb-4">
+                                    <input
+                                        dir="ltr"
+                                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="https://image-url.com"
+                                        value={imageInput}
+                                        onChange={e => setImageInput(e.target.value)}
+                                    />
+                                    <button type="button" onClick={addImage} className="px-3 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700">إضافة</button>
+                                </div>
+                            )}
+                            <div className="space-y-3">
+                                {images.length === 0 && (
+                                    <div className="text-sm text-gray-500">لا توجد صور بعد</div>
+                                )}
+                                {images.map((img, idx) => (
+                                    <div key={`${img}-${idx}`} className="rounded-xl border border-gray-200 overflow-hidden">
+                                        <div className="relative aspect-video bg-gray-100 flex items-center justify-center">
+                                            <Image src={img} alt="" fill className="object-cover" unoptimized loader={() => img} />
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2 px-3 py-2 text-xs text-gray-600">
+                                            <span className="truncate" dir="ltr">{img}</span>
+                                            {isEditing && (
+                                                <button type="button" onClick={() => removeImage(idx)} className="text-red-500 hover:text-red-600 font-semibold">حذف</button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-white border border-gray-200 rounded-2xl p-5">
+                            <h4 className="font-bold text-gray-800 text-sm uppercase mb-4">هوية المنافس</h4>
+                            <div className="space-y-3 mb-4">
+                                {isEditing ? (
+                                    <>
+                                        <input
+                                            dir="ltr"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            placeholder="رابط شعار المنافس"
+                                            value={logoUrl}
+                                            onChange={e => setLogoUrl(e.target.value)}
+                                        />
+                                        {logoUrl.trim() && (
+                                            <div className="relative h-24 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+                                                <Image src={logoUrl} alt={name || "logo"} fill className="object-contain" unoptimized loader={() => logoUrl} />
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        {logoUrl.trim() ? (
+                                            <div className="relative h-24 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+                                                <Image src={logoUrl} alt={name || "logo"} fill className="object-contain" unoptimized loader={() => logoUrl} />
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-gray-500">لا يوجد شعار بعد</div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                {bgColors.map(c => (
+                                    <button
+                                        type="button"
+                                        key={c}
+                                        onClick={() => isEditing && setColor(c)}
+                                        className={`h-10 rounded-lg ${c} ${color === c ? 'ring-2 ring-offset-2 ring-indigo-500' : ''} ${isEditing ? '' : 'opacity-60 cursor-not-allowed'}`}
+                                    />
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div>
-                    <label className="label">السعر</label>
-                    <select className="input-field" value={pricePoint} onChange={e => setPricePoint(e.target.value)}>
-                        <option value="Free">مجاني</option>
-                        <option value="$">$ (اقتصادي)</option>
-                        <option value="$$">$$ (متوسط)</option>
-                        <option value="$$$">$$$ (غالي)</option>
-                    </select>
-                </div>
-
-                {/* Tags Inputs */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="label text-green-700">نقاط القوة</label>
-                        <div className="flex gap-2 mb-2">
-                            <input
-                                className="input-field text-sm"
-                                placeholder="اكتب واضغط Enter..."
-                                value={sInput}
-                                onChange={e => setSInput(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag('s'))}
-                            />
-                            <button type="button" onClick={() => addTag('s')} className="px-3 bg-green-100 text-green-700 rounded-lg text-lg hover:bg-green-200">+</button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {strengths.map((s, i) => (
-                                <span key={i} className="bg-green-50 text-green-800 text-sm px-2 py-1 rounded border border-green-100 flex items-center gap-1 font-medium">
-                                    {s}
-                                    <button type="button" onClick={() => setStrengths(strengths.filter((_, idx) => idx !== i))} className="hover:text-red-500">×</button>
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="label text-red-700">نقاط الضعف</label>
-                        <div className="flex gap-2 mb-2">
-                            <input
-                                className="input-field text-sm"
-                                placeholder="اكتب واضغط Enter..."
-                                value={wInput}
-                                onChange={e => setWInput(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addTag('w'))}
-                            />
-                            <button type="button" onClick={() => addTag('w')} className="px-3 bg-red-100 text-red-700 rounded-lg text-lg hover:bg-red-200">+</button>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {weaknesses.map((w, i) => (
-                                <span key={i} className="bg-red-50 text-red-800 text-sm px-2 py-1 rounded border border-red-100 flex items-center gap-1 font-medium">
-                                    {w}
-                                    <button type="button" onClick={() => setWeaknesses(weaknesses.filter((_, idx) => idx !== i))} className="hover:text-red-500">×</button>
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <button type="submit" className="btn-primary w-full">حفظ البيانات</button>
+                {isEditing && (
+                    <button type="submit" className="btn-primary w-full">حفظ التعديلات</button>
+                )}
             </form>
-        </ModalLayout>
+        </DossierModalLayout>
+    );
+}
+
+function DossierModalLayout({ onClose, header, actions, children }: { onClose: () => void; header: ReactNode; actions?: ReactNode; children: ReactNode; }) {
+    useEffect(() => {
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = originalOverflow;
+        };
+    }, []);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-6xl h-[92vh] rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 bg-white flex flex-col">
+                <div className="flex items-start justify-between gap-4 p-6 border-b border-gray-100">
+                    <div className="flex-1">{header}</div>
+                    <div className="flex items-center gap-2">
+                        {actions}
+                        <button onClick={onClose} className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-full transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+                <div className="p-6 bg-white overflow-y-auto flex-1">
+                    {children}
+                </div>
+            </div>
+        </div>
     );
 }
 

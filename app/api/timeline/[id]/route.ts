@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Milestone from '@/models/Milestone';
+import { logActivity } from '@/lib/activity';
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
     await dbConnect();
@@ -13,6 +14,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
             return NextResponse.json({ error: 'Milestone not found' }, { status: 404 });
         }
 
+        await logActivity({
+            action: "UPDATE",
+            entity: "Timeline",
+            description: `تم تحديث مرحلة: ${milestone.phase}`,
+            user: "System",
+        });
         return NextResponse.json(milestone);
     } catch {
         return NextResponse.json({ error: 'Failed to update milestone' }, { status: 400 });
@@ -29,6 +36,12 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
             return NextResponse.json({ error: 'Milestone not found' }, { status: 404 });
         }
 
+        await logActivity({
+            action: "DELETE",
+            entity: "Timeline",
+            description: `تم حذف مرحلة: ${milestone.phase}`,
+            user: "System",
+        });
         return NextResponse.json({ message: 'Milestone deleted successfully' });
     } catch {
         return NextResponse.json({ error: 'Failed to delete milestone' }, { status: 400 });

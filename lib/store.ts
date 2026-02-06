@@ -30,6 +30,7 @@ export interface Asset {
     price: number;
     status: AssetStatus;
     owner: string;
+    note?: string;
 }
 
 export interface MonthlyExpense {
@@ -39,6 +40,7 @@ export interface MonthlyExpense {
     amount: number;
     status: ExpenseStatus;
     billingDate?: string;
+    note?: string;
 }
 
 export interface Task {
@@ -255,11 +257,12 @@ export interface Competitor {
     id: string;
     name: string;
     logo: string;
-    pricePoint: string;
+    logoUrl?: string;
     strengths: string[];
     weaknesses: string[];
     url: string;
-    notes?: string;
+    richNotes?: string;
+    images?: string[];
 }
 
 export const initialCategories: string[] = ["General", "Marketing", "Product", "Feature", "Content"];
@@ -296,31 +299,34 @@ export const initialCompetitors: Competitor[] = [
         id: '1',
         name: 'JoAcademy',
         logo: 'bg-blue-600',
+        logoUrl: '',
         strengths: ['قاعدة طلاب ضخمة', 'علامة تجارية قوية', 'محتوى متنوع'],
         weaknesses: ['واجهة قديمة', 'أسعار مرتفعة', 'دعم فني بطيء'],
-        pricePoint: '$$$',
         url: 'joacademy.com',
-        notes: ''
+        richNotes: '',
+        images: []
     },
     {
         id: '2',
         name: 'Abwaab',
         logo: 'bg-indigo-500',
+        logoUrl: '',
         strengths: ['تكنولوجيا حديثة', 'دروس قصيرة', 'أسعار منافسة'],
         weaknesses: ['تغطية مواد أقل', 'غياب التفاعل المباشر'],
-        pricePoint: '$$',
         url: 'abwaab.com',
-        notes: ''
+        richNotes: '',
+        images: []
     },
     {
         id: '3',
         name: 'Weted',
         logo: 'bg-emerald-500',
+        logoUrl: '',
         strengths: ['مجتمع طلابي قوي', 'اختبارات مكثفة'],
         weaknesses: ['تصميم بسيط', 'تسويق محدود'],
-        pricePoint: '$',
         url: 'weted.com',
-        notes: ''
+        richNotes: '',
+        images: []
     },
 ];
 

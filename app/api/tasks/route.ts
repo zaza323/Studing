@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Task from '@/models/Task';
+import { logActivity } from '@/lib/activity';
 import { tasks as seedTasks } from "@/lib/store";
 
 type MemoryTask = (typeof seedTasks)[number] & { _id: string };
@@ -83,11 +84,23 @@ export async function POST(request: Request) {
     try {
         await dbConnect();
         const task = await Task.create(body);
+        await logActivity({
+            action: "CREATE",
+            entity: "Task",
+            description: `تم إنشاء مهمة جديدة: ${task.title}`,
+            user: "System",
+        });
         return NextResponse.json(task, { status: 201 });
     } catch {
         const memoryTask = { _id: createMemoryId(), ...body } as MemoryTask;
         const tasks = getMemoryTasks();
         tasks.push(memoryTask);
+        await logActivity({
+            action: "CREATE",
+            entity: "Task",
+            description: `تم إنشاء مهمة جديدة: ${memoryTask.title}`,
+            user: "System",
+        });
         return NextResponse.json(memoryTask, { status: 201 });
     }
 }

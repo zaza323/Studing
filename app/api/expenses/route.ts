@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Expense from '@/models/Expense';
 import { budget } from "@/lib/store";
+import { logActivity } from '@/lib/activity';
 
 type MemoryExpense = (typeof budget.monthlyCosts)[number] & { _id: string };
 
@@ -34,11 +35,23 @@ export async function POST(request: Request) {
     try {
         await dbConnect();
         const expense = await Expense.create(body);
+        await logActivity({
+            action: "CREATE",
+            entity: "Expense",
+            description: `تمت إضافة مصروف جديد: ${expense.name}`,
+            user: "System",
+        });
         return NextResponse.json(expense, { status: 201 });
     } catch {
         const memoryExpense = { _id: createMemoryId(), ...body } as MemoryExpense;
         const expenses = getMemoryExpenses();
         expenses.push(memoryExpense);
+        await logActivity({
+            action: "CREATE",
+            entity: "Expense",
+            description: `تمت إضافة مصروف جديد: ${memoryExpense.name}`,
+            user: "System",
+        });
         return NextResponse.json(memoryExpense, { status: 201 });
     }
 }

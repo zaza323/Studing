@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, type ElementType } from "react";
+import { useState, useEffect, Suspense, type ElementType, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
 import { teamMembers } from "@/lib/store";
 import type { Asset as BaseAsset, AssetStatus, AssetCategory } from "@/lib/store";
@@ -19,6 +19,14 @@ function AssetsContent() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<AssetCategory | "All">("All");
+    const [expandedAssetId, setExpandedAssetId] = useState<string | null>(null);
+    const categoryLabels: Record<AssetCategory, string> = {
+        Production: "إنتاج وتصوير",
+        Infrastructure: "بنية تحتية",
+        Electronics: "أجهزة إلكترونية",
+        Licenses: "تراخيص وتصاريح",
+        Furniture: "الأثاث",
+    };
 
     // Fetch Assets
     useEffect(() => {
@@ -233,7 +241,11 @@ function AssetsContent() {
                     <h3 className="font-bold text-gray-700 flex items-center gap-2">
                         <FolderOpen className="w-5 h-5" />
                         قائمة الأصول
-                        {selectedCategory !== "All" && <span className="text-sm font-normal text-gray-500">({selectedCategory})</span>}
+                        {selectedCategory !== "All" && (
+                            <span className="text-sm font-normal text-gray-500">
+                                ({categoryLabels[selectedCategory]})
+                            </span>
+                        )}
                     </h3>
                     <span className="text-sm text-gray-500">
                         {filteredAssets.length} عنصر
@@ -261,38 +273,57 @@ function AssetsContent() {
                                 </tr>
                             ) : (
                                 filteredAssets.map((asset) => (
-                                    <tr key={asset._id} className="hover:bg-gray-50 transition-colors group">
-                                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{asset.name}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                            <CategoryBadge category={asset.category} />
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${asset.price.toLocaleString()}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <StatusDropdown
-                                                currentStatus={asset.status}
-                                                onUpdate={(s) => handleUpdateStatus(asset._id, s)}
-                                            />
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{asset.owner}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => setEditingAsset(asset)}
-                                                    className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50"
-                                                    title="تعديل"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteAsset(asset._id)}
-                                                    className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded-full hover:bg-red-50"
-                                                    title="حذف"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <Fragment key={asset._id}>
+                                        <tr
+                                            className="hover:bg-gray-50 transition-colors group cursor-pointer"
+                                            onClick={() => setExpandedAssetId(expandedAssetId === asset._id ? null : asset._id)}
+                                        >
+                                            <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{asset.name}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                                <CategoryBadge category={asset.category} />
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${asset.price.toLocaleString()}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                <StatusDropdown
+                                                    currentStatus={asset.status}
+                                                    onUpdate={(s) => handleUpdateStatus(asset._id, s)}
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{asset.owner}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingAsset(asset);
+                                                        }}
+                                                        className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50"
+                                                        title="تعديل"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteAsset(asset._id);
+                                                        }}
+                                                        className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded-full hover:bg-red-50"
+                                                        title="حذف"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {expandedAssetId === asset._id && (
+                                            <tr className="bg-gray-50">
+                                                <td colSpan={6} className="px-6 py-4 text-sm text-gray-600">
+                                                    <span className="font-medium text-gray-700">الملاحظة: </span>
+                                                    {asset.note?.trim() ? asset.note : "لا توجد ملاحظة"}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
                                 ))
                             )}
                         </tbody>
@@ -393,10 +424,10 @@ function CategoryBadge({ category }: { category: AssetCategory }) {
     };
 
     const labels: Record<AssetCategory, string> = {
-        Production: "إنتاج",
+        Production: "إنتاج وتصوير",
         Infrastructure: "بنية تحتية",
-        Electronics: "إلكترونيات",
-        Licenses: "تراخيص",
+        Electronics: "أجهزة إلكترونية",
+        Licenses: "تراخيص وتصاريح",
         Furniture: "الأثاث",
     };
 
@@ -468,7 +499,8 @@ function AssetModal({
         owner: (initialData?.owner && ownerOptions.includes(initialData.owner))
             ? initialData.owner
             : ownerOptions[0] ?? "",
-        status: initialData?.status || "للشراء" as AssetStatus
+        status: initialData?.status || "للشراء" as AssetStatus,
+        note: initialData?.note || ""
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -479,7 +511,8 @@ function AssetModal({
             category: formData.category,
             price: parseFloat(formData.price),
             owner: formData.owner || "--",
-            status: formData.status
+            status: formData.status,
+            note: formData.note
         });
     };
 
@@ -562,6 +595,16 @@ function AssetModal({
                                 <option value="تم الاستلام">تم الاستلام</option>
                             </select>
                         </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ملاحظة</label>
+                        <textarea
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.note}
+                            onChange={e => setFormData({ ...formData, note: e.target.value })}
+                            placeholder="أضف ملاحظة..."
+                        />
                     </div>
 
                     <button

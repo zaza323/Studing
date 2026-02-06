@@ -42,14 +42,14 @@ const navItems = [
         icon: Calendar,
     },
     {
-        name: "الميزانية",
-        href: "/budget",
-        icon: DollarSign,
-    },
-    {
         name: "الاستراتيجية",
         href: "/strategy",
         icon: Lightbulb,
+    },
+    {
+        name: "الميزانية",
+        href: "/budget",
+        icon: DollarSign,
     },
 ];
 

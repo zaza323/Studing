@@ -6,6 +6,7 @@ export interface IExpense extends Document {
     amount: number;
     status: 'Active' | 'Paused' | 'Cancelled';
     isMonthly: boolean;
+    note?: string;
 }
 
 const ExpenseSchema = new Schema<IExpense>({
@@ -19,6 +20,14 @@ const ExpenseSchema = new Schema<IExpense>({
         default: 'Active'
     },
     isMonthly: { type: Boolean, default: true },
+    note: { type: String, default: "" },
 }, { timestamps: true });
+
+const existingModel = mongoose.models.Expense as mongoose.Model<IExpense> | undefined;
+const hasNoteField = Boolean(existingModel?.schema?.path("note"));
+
+if (existingModel && !hasNoteField) {
+    delete mongoose.models.Expense;
+}
 
 export default mongoose.models.Expense || mongoose.model<IExpense>('Expense', ExpenseSchema);

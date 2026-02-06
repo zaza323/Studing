@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Milestone from '@/models/Milestone';
+import { logActivity } from '@/lib/activity';
 import { milestones as seedMilestones } from "@/lib/store";
 
 type MemoryMilestone = (typeof seedMilestones)[number] & { _id: string };
@@ -36,11 +37,23 @@ export async function POST(request: Request) {
     try {
         await dbConnect();
         const milestone = await Milestone.create(body);
+        await logActivity({
+            action: "CREATE",
+            entity: "Timeline",
+            description: `تمت إضافة مرحلة جديدة: ${milestone.phase}`,
+            user: "System",
+        });
         return NextResponse.json(milestone, { status: 201 });
     } catch {
         const memoryMilestone = { _id: createMemoryId(), ...body } as MemoryMilestone;
         const milestones = getMemoryMilestones();
         milestones.push(memoryMilestone);
+        await logActivity({
+            action: "CREATE",
+            entity: "Timeline",
+            description: `تمت إضافة مرحلة جديدة: ${memoryMilestone.phase}`,
+            user: "System",
+        });
         return NextResponse.json(memoryMilestone, { status: 201 });
     }
 }

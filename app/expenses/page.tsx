@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, type ElementType } from "react";
+import { useState, useEffect, Suspense, type ElementType, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
 import type { MonthlyExpense as BaseMonthlyExpense, ExpenseCategory, ExpenseStatus } from "@/lib/store";
 import { Plus, Trash2, X, FolderOpen, Receipt, Zap, Box, DollarSign, Pencil, Loader2 } from "lucide-react";
@@ -18,6 +18,7 @@ function ExpensesContent() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingExpense, setEditingExpense] = useState<MonthlyExpense | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<ExpenseCategory | "All">("All");
+    const [expandedExpenseId, setExpandedExpenseId] = useState<string | null>(null);
 
     // Fetch Expenses
     useEffect(() => {
@@ -237,37 +238,56 @@ function ExpensesContent() {
                                 </tr>
                             ) : (
                                 filteredExpenses.map((expense) => (
-                                    <tr key={expense._id} className="hover:bg-gray-50 transition-colors group">
-                                        <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{expense.name}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                            <CategoryBadge category={expense.category} />
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${expense.amount.toLocaleString()}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <StatusDropdown
-                                                currentStatus={expense.status}
-                                                onUpdate={(s) => handleUpdateStatus(expense._id, s)}
-                                            />
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => setEditingExpense(expense)}
-                                                    className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50"
-                                                    title="تعديل"
-                                                >
-                                                    <Pencil className="w-4 h-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteExpense(expense._id)}
-                                                    className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded-full hover:bg-red-50"
-                                                    title="حذف"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <Fragment key={expense._id}>
+                                        <tr
+                                            className="hover:bg-gray-50 transition-colors group cursor-pointer"
+                                            onClick={() => setExpandedExpenseId(expandedExpenseId === expense._id ? null : expense._id)}
+                                        >
+                                            <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{expense.name}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                                                <CategoryBadge category={expense.category} />
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">${expense.amount.toLocaleString()}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                                                <StatusDropdown
+                                                    currentStatus={expense.status}
+                                                    onUpdate={(s) => handleUpdateStatus(expense._id, s)}
+                                                />
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingExpense(expense);
+                                                        }}
+                                                        className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded-full hover:bg-blue-50"
+                                                        title="تعديل"
+                                                    >
+                                                        <Pencil className="w-4 h-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDeleteExpense(expense._id);
+                                                        }}
+                                                        className="text-gray-400 hover:text-red-600 transition-colors p-1 rounded-full hover:bg-red-50"
+                                                        title="حذف"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {expandedExpenseId === expense._id && (
+                                            <tr className="bg-gray-50">
+                                                <td colSpan={5} className="px-6 py-4 text-sm text-gray-600">
+                                                    <span className="font-medium text-gray-700">الملاحظة: </span>
+                                                    {expense.note?.trim() ? expense.note : "لا توجد ملاحظة"}
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </Fragment>
                                 ))
                             )}
                         </tbody>
@@ -440,7 +460,8 @@ function ExpenseModal({
         name: initialData?.name || "",
         category: initialData?.category || "Software" as ExpenseCategory,
         amount: initialData?.amount?.toString() || "",
-        status: initialData?.status || "Active" as ExpenseStatus
+        status: initialData?.status || "Active" as ExpenseStatus,
+        note: initialData?.note || ""
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -450,7 +471,8 @@ function ExpenseModal({
             name: formData.name,
             category: formData.category,
             amount: parseFloat(formData.amount),
-            status: formData.status
+            status: formData.status,
+            note: formData.note
         });
     };
 
@@ -515,6 +537,16 @@ function ExpenseModal({
                             <option value="Paused">موقف مؤقتاً</option>
                             <option value="Cancelled">ملغى</option>
                         </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ملاحظة</label>
+                        <textarea
+                            rows={3}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            value={formData.note}
+                            onChange={e => setFormData({ ...formData, note: e.target.value })}
+                            placeholder="أضف ملاحظة..."
+                        />
                     </div>
 
                     <button

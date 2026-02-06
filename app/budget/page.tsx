@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { MonthlyExpense as BaseMonthlyExpense, ExpenseCategory, Asset as BaseAsset } from "@/lib/store";
-import { DollarSign, TrendingUp, Users, Plus, Trash2, X, Loader2 } from "lucide-react";
+import type { MonthlyExpense as BaseMonthlyExpense, ExpenseCategory, Asset as BaseAsset, AssetCategory } from "@/lib/store";
+import { DollarSign, TrendingUp, Users, Loader2, Pencil } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 // Extend types to support MongoDB _id
@@ -21,10 +21,9 @@ export default function BudgetPage() {
     const [monthlyCosts, setMonthlyCosts] = useState<MonthlyExpense[]>([]);
     const [assets, setAssets] = useState<Asset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-
-    // Constants (could be fetched from config or env in future)
-    const revenuePerStudent = 49.99;
+    const [revenuePerStudentInput, setRevenuePerStudentInput] = useState("49.99");
+    const [isRevenueEditorOpen, setIsRevenueEditorOpen] = useState(false);
+    const [revenueDraft, setRevenueDraft] = useState("49.99");
 
     // Fetch Data
     useEffect(() => {
@@ -52,10 +51,36 @@ export default function BudgetPage() {
         fetchData();
     }, []);
 
+    useEffect(() => {
+        const storedRevenue = localStorage.getItem("revenuePerStudent");
+        if (storedRevenue !== null) {
+            setRevenuePerStudentInput(storedRevenue);
+            setRevenueDraft(storedRevenue);
+        }
+    }, []);
+
     // Calculations
+    const revenuePerStudent = Number(revenuePerStudentInput);
+    const safeRevenuePerStudent = Number.isFinite(revenuePerStudent) ? revenuePerStudent : 0;
     const totalOneTime = assets.reduce((sum, item) => sum + item.price, 0);
     const totalMonthly = monthlyCosts.reduce((sum, item) => sum + item.amount, 0);
-    const breakEvenStudents = Math.ceil(totalMonthly / revenuePerStudent);
+    const breakEvenStudents = safeRevenuePerStudent > 0
+        ? Math.ceil(totalMonthly / safeRevenuePerStudent)
+        : 0;
+
+    const assetCategoryLabels: Record<AssetCategory, string> = {
+        Production: "إنتاج وتصوير",
+        Infrastructure: "بنية تحتية",
+        Electronics: "أجهزة إلكترونية",
+        Licenses: "تراخيص وتصاريح",
+        Furniture: "الأثاث",
+    };
+
+    const expenseCategoryLabels: Record<ExpenseCategory, string> = {
+        Software: "الخدمات والاشتراكات الرقمية",
+        Utilities: "خدمات أساسية",
+        Other: "رواتب الموظفين",
+    };
 
     const getAssetCategoryTotals = () => {
         const categories: Record<string, number> = {};
@@ -66,44 +91,24 @@ export default function BudgetPage() {
                 categories[asset.category] = asset.price;
             }
         });
-        return Object.entries(categories).map(([name, value]) => ({ name, value }));
+        return Object.entries(categories).map(([name, value]) => ({
+            name: assetCategoryLabels[name as AssetCategory] ?? name,
+            value,
+        }));
     };
 
     const assetCategories = getAssetCategoryTotals();
     const chartData = assetCategories;
 
-    // Handlers
-    const handleAddExpense = async (newExpense: Omit<MonthlyExpense, "_id" | "id" | "status">) => {
-        try {
-            const res = await fetch("/api/expenses", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...newExpense, status: "Active" }),
-            });
-            if (res.ok) {
-                const savedExpense = await res.json();
-                setMonthlyCosts([...monthlyCosts, savedExpense]);
-                setIsAddModalOpen(false);
-            }
-        } catch (error) {
-            console.error("Failed to add expense", error);
-        }
-    };
-
-    const handleDeleteExpense = async (id: string) => {
-        if (confirm("هل أنت متأكد من حذف هذا المصروف؟")) {
-            try {
-                const res = await fetch(`/api/expenses/${id}`, {
-                    method: "DELETE",
-                });
-                if (res.ok) {
-                    setMonthlyCosts(monthlyCosts.filter((c) => c._id !== id));
-                }
-            } catch (error) {
-                console.error("Failed to delete expense", error);
-            }
-        }
-    };
+    const expenseCategories: ExpenseCategory[] = ["Software", "Utilities", "Other"];
+    const monthlyCategoryTotals = expenseCategories
+        .map((category) => ({
+            category,
+            total: monthlyCosts
+                .filter((cost) => cost.category === category)
+                .reduce((sum, cost) => sum + cost.amount, 0),
+        }))
+        .filter((entry) => entry.total > 0);
 
     const COLORS = ["#10b981", "#06b6d4", "#8b5cf6", "#f59e0b", "#ec4899", "#ef4444", "#3b82f6"];
 
@@ -189,43 +194,33 @@ export default function BudgetPage() {
                     </div>
                 </div>
 
-                {/* Monthly Costs Breakdown (Editable) */}
+                {/* Monthly Costs Breakdown */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col h-full">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-xl font-bold text-gray-900">
                             التكاليف التشغيلية الشهرية
                         </h2>
-                        <button
-                            onClick={() => setIsAddModalOpen(true)}
-                            className="text-blue-600 hover:bg-blue-50 p-1.5 rounded-lg transition-colors flex items-center gap-1 text-sm font-medium"
-                        >
-                            <Plus className="w-4 h-4" /> إضافة
-                        </button>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-medium">
+                            تلقائي
+                        </span>
                     </div>
 
                     <div className="space-y-3 flex-1">
-                        {monthlyCosts.length === 0 ? (
+                        {monthlyCategoryTotals.length === 0 ? (
                             <p className="text-center text-gray-400 py-4">لا توجد تكاليف شهرية</p>
                         ) : (
-                            monthlyCosts.map((cost) => (
+                            monthlyCategoryTotals.map((entry) => (
                                 <div
-                                    key={cost._id}
-                                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg group"
+                                    key={entry.category}
+                                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                                 >
-                                    <div className="flex flex-col">
-                                        <span className="text-gray-700 font-medium">{cost.name}</span>
-                                        <span className="text-xs text-gray-400">{cost.category === "Software" ? "الخدمات والاشتراكات الرقمية" : cost.category === "Utilities" ? "خدمات أساسية" : "رواتب الموظفين"}</span>
-                                    </div>
+                                    <span className="text-gray-700 font-medium">
+                                        {expenseCategoryLabels[entry.category]}
+                                    </span>
                                     <div className="flex items-center gap-3">
                                         <span className="font-semibold text-gray-900">
-                                            ${cost.amount.toLocaleString()}/شهر
+                                            ${entry.total.toLocaleString()}/شهر
                                         </span>
-                                        <button
-                                            onClick={() => handleDeleteExpense(cost._id)}
-                                            className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition-opacity"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
                                     </div>
                                 </div>
                             ))
@@ -285,11 +280,54 @@ export default function BudgetPage() {
                         تحليل الاستدامة المالية
                     </h2>
                     <div className="space-y-4">
-                        <div className="p-4 bg-purple-50 rounded-lg">
+                        <div className="p-4 bg-purple-50 rounded-lg relative">
                             <p className="text-sm text-gray-600 mb-1">الإيرادات المتوقعة لكل طالب</p>
                             <p className="text-2xl font-bold text-purple-600">
-                                ${revenuePerStudent}/شهر
+                                ${safeRevenuePerStudent.toLocaleString()}/شهر
                             </p>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setRevenueDraft(revenuePerStudentInput);
+                                    setIsRevenueEditorOpen((prev) => !prev);
+                                }}
+                                className="absolute left-3 top-3 rounded-md border border-purple-200 bg-white p-1.5 text-purple-600 shadow-sm hover:bg-purple-50"
+                            >
+                                <Pencil className="h-4 w-4" />
+                            </button>
+                            {isRevenueEditorOpen && (
+                                <div className="absolute left-3 top-12 z-10 w-64 rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+                                    <p className="text-xs text-gray-600 mb-2">كم تريد أن يكون الرقم الجديد؟</p>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={revenueDraft}
+                                        onChange={(event) => setRevenueDraft(event.target.value)}
+                                        className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 focus:border-purple-300 focus:outline-none"
+                                    />
+                                    <div className="mt-3 flex items-center justify-end gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsRevenueEditorOpen(false)}
+                                            className="rounded-md px-3 py-1 text-xs text-gray-600 hover:bg-gray-100"
+                                        >
+                                            إلغاء
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setRevenuePerStudentInput(revenueDraft);
+                                                localStorage.setItem("revenuePerStudent", revenueDraft);
+                                                setIsRevenueEditorOpen(false);
+                                            }}
+                                            className="rounded-md bg-purple-600 px-3 py-1 text-xs text-white hover:bg-purple-700"
+                                        >
+                                            حفظ
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="p-4 bg-blue-50 rounded-lg">
@@ -313,13 +351,6 @@ export default function BudgetPage() {
                 </div>
             </div>
 
-            {/* Add Cost Modal */}
-            {isAddModalOpen && (
-                <AddCostModal
-                    onClose={() => setIsAddModalOpen(false)}
-                    onAdd={handleAddExpense}
-                />
-            )}
         </div>
     );
 }
@@ -351,92 +382,5 @@ function SummaryCard({
     );
 }
 
-function AddCostModal({
-    onClose,
-    onAdd
-}: {
-    onClose: () => void,
-    onAdd: (c: { name: string, category: ExpenseCategory, amount: number }) => void
-}) {
-    const [formData, setFormData] = useState({ name: "", category: "Software", amount: "" });
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.name || !formData.amount) return;
-        onAdd({
-            name: formData.name,
-            category: formData.category as ExpenseCategory,
-            amount: parseFloat(formData.amount)
-        });
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="flex items-center justify-between p-4 border-b border-gray-100">
-                    <h3 className="text-lg font-bold text-gray-900">إضافة تكلفة شهرية</h3>
-                    <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">اسم البند</label>
-                        <input
-                            required
-                            type="text"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.name}
-                            onChange={e => setFormData({ ...formData, name: e.target.value })}
-                            placeholder="مثال: فاتورة كهرباء، اشتراك Zoom"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">الفئة</label>
-                        <select
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.category}
-                            onChange={e => setFormData({ ...formData, category: e.target.value })}
-                        >
-                            <option value="Software">الخدمات والاشتراكات الرقمية</option>
-                            <option value="Utilities">خدمات أساسية</option>
-                            <option value="Other">أخرى</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">التكلفة الشهرية ($)</label>
-                        <input
-                            required
-                            type="number"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            value={formData.amount}
-                            onChange={e => setFormData({ ...formData, amount: e.target.value })}
-                            placeholder="0.00"
-                        />
-                    </div>
-
-                    <div className="pt-4 flex gap-3">
-                        <button
-                            type="submit"
-                            className="flex-1 text-white font-medium py-2 rounded-lg transition-colors bg-blue-600 hover:bg-blue-700"
-                        >
-                            إضافة
-                        </button>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-lg transition-colors"
-                        >
-                            إلغاء
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
 
 
