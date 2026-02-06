@@ -3,6 +3,8 @@ import dbConnect from "@/lib/db";
 import Activity from "@/models/Activity";
 import { getRecentMemoryActivities } from "@/lib/activity";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
     try {
         await dbConnect();
