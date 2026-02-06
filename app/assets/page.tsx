@@ -370,6 +370,7 @@ type CategoryMetrics = {
 
 type CategoryCardProps = {
     title: string;
+    category?: AssetCategory;
     icon: ElementType;
     color: CategoryColor;
     metrics: CategoryMetrics;

@@ -266,7 +266,7 @@ export default function BudgetPage() {
                                     ))}
                                 </Pie>
                                 <Tooltip
-                                    formatter={(value: number | string) => [`$${Number(value).toLocaleString()}`, "القيمة"]}
+                                    formatter={(value) => [`$${Number(value ?? 0).toLocaleString()}`, "القيمة"]}
                                 />
                                 <Legend />
                             </PieChart>

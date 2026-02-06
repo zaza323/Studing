@@ -334,6 +334,7 @@ type CategoryMetrics = {
 
 type CategoryCardProps = {
     title: string;
+    category?: ExpenseCategory;
     icon: ElementType;
     color: CategoryColor;
     metrics: CategoryMetrics;
