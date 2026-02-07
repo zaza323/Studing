@@ -2,13 +2,20 @@
 
 import { useState, useEffect, Suspense, type ElementType, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
-import type { MonthlyExpense as BaseMonthlyExpense, ExpenseCategory, ExpenseStatus } from "@/lib/store";
 import { Plus, Trash2, X, FolderOpen, Receipt, Zap, Box, DollarSign, Pencil, Loader2 } from "lucide-react";
 
-// Extend to support MongoDB _id
-interface MonthlyExpense extends Omit<BaseMonthlyExpense, "id"> {
+type ExpenseCategory = "Software" | "Utilities" | "Other";
+type ExpenseStatus = "Active" | "Paused" | "Cancelled";
+
+interface MonthlyExpense {
     _id: string;
     id?: string;
+    name: string;
+    category: ExpenseCategory;
+    amount: number;
+    status: ExpenseStatus;
+    billingDate?: string;
+    note?: string;
 }
 
 function ExpensesContent() {

@@ -14,7 +14,18 @@ import {
   Loader2,
   Pencil
 } from "lucide-react";
-import type { Asset, Task } from "@/lib/store";
+
+type Asset = {
+  _id: string;
+  id?: string;
+  price: number;
+};
+
+type Task = {
+  _id: string;
+  id?: string;
+  status: "قيد الانتظار" | "قيد التنفيذ" | "مكتملة";
+};
 
 const getTodayDateInput = () => new Date().toISOString().slice(0, 10);
 
@@ -43,12 +54,9 @@ export default function Home() {
   });
 
   useEffect(() => {
-    let hasStoredLaunchDate = false;
-    let hasStoredBudget = false;
     const storedLaunchDate = localStorage.getItem("launchDate");
     if (storedLaunchDate) {
       setLaunchDate(storedLaunchDate);
-      hasStoredLaunchDate = true;
     }
     const storedTotalBudget = localStorage.getItem("totalBudget");
     if (storedTotalBudget) {
@@ -56,23 +64,8 @@ export default function Home() {
       if (!Number.isNaN(parsedBudget)) {
         setTotalBudget(parsedBudget);
         setNewBudgetValue(parsedBudget);
-        hasStoredBudget = true;
       }
     }
-    if (process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production") {
-      return;
-    }
-    import("@/lib/store")
-      .then(({ budget, defaultLaunchDate }) => {
-        if (!hasStoredLaunchDate) {
-          setLaunchDate(defaultLaunchDate);
-        }
-        if (!hasStoredBudget) {
-          setTotalBudget(budget.totalBudget);
-          setNewBudgetValue(budget.totalBudget);
-        }
-      })
-      .catch(() => {});
   }, []);
 
   useEffect(() => {

@@ -2,32 +2,6 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import Task from '@/models/Task';
 import { logActivity } from '@/lib/activity';
-type MemoryTask = {
-    _id: string;
-    id?: string;
-    title: string;
-    description: string;
-    status: string;
-    assignee: string;
-    priority: string;
-};
-
-const isProduction = process.env.VERCEL_ENV === "production";
-
-const globalForTasks = globalThis as unknown as { __memoryTasks?: MemoryTask[] };
-
-const getMemoryTasks = async () => {
-    if (!globalForTasks.__memoryTasks) {
-        const { tasks: seedTasks } = await import("@/lib/store");
-        globalForTasks.__memoryTasks = seedTasks.map((task) => ({
-            ...task,
-            _id: task.id,
-        }));
-    }
-    return globalForTasks.__memoryTasks;
-};
-
-const createMemoryId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 export async function GET(request: Request) {
     const url = new URL(request.url);
@@ -84,11 +58,7 @@ export async function GET(request: Request) {
         if (shouldMigrate) {
             return NextResponse.json({ error: "Failed to migrate tasks" }, { status: 500 });
         }
-        if (isProduction) {
-            return NextResponse.json([]);
-        }
-        const tasks = await getMemoryTasks();
-        return NextResponse.json(tasks);
+        return NextResponse.json({ error: "Failed to fetch tasks" }, { status: 500 });
     }
 }
 
@@ -105,18 +75,6 @@ export async function POST(request: Request) {
         });
         return NextResponse.json(task, { status: 201 });
     } catch {
-        if (isProduction) {
-            return NextResponse.json({ error: "Database unavailable" }, { status: 503 });
-        }
-        const memoryTask = { _id: createMemoryId(), ...body } as MemoryTask;
-        const tasks = await getMemoryTasks();
-        tasks.push(memoryTask);
-        await logActivity({
-            action: "CREATE",
-            entity: "Task",
-            description: `تم إنشاء مهمة جديدة: ${memoryTask.title}`,
-            user: "System",
-        });
-        return NextResponse.json(memoryTask, { status: 201 });
+        return NextResponse.json({ error: "Failed to create task" }, { status: 500 });
     }
 }

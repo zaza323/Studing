@@ -1,13 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Milestone as BaseMilestone } from "@/lib/store";
 import { Calendar, CheckCircle2, Clock, Circle, Plus, Trash2, X, Loader2, Pencil } from "lucide-react";
 
-// Extend Milestone to support MongoDB _id
-interface Milestone extends Omit<BaseMilestone, "id"> {
+interface Milestone {
     _id: string;
     id?: string;
+    phase: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    isComplete: boolean;
+    isCurrent: boolean;
 }
 
 export default function TimelinePage() {

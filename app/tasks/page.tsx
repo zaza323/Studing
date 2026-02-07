@@ -1,13 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { Task as BaseTask, TaskStatus, Priority } from "@/lib/store";
 import { Filter, Plus, Trash2, X, Loader2 } from "lucide-react";
 
-// Extend Task to support MongoDB _id
-interface Task extends Omit<BaseTask, "id"> {
+type TaskStatus = "قيد الانتظار" | "قيد التنفيذ" | "مكتملة";
+type Priority = "عالية" | "متوسطة" | "منخفضة";
+
+interface Task {
     _id: string;
     id?: string;
+    title: string;
+    description: string;
+    status: TaskStatus;
+    assignee: string;
+    priority: Priority;
 }
 
 type AssigneeInfo = {
@@ -16,7 +22,6 @@ type AssigneeInfo = {
 };
 
 export default function TasksPage() {
-    const isProduction = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
     const [tasks, setTasks] = useState<Task[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState<string>("all");
@@ -42,27 +47,6 @@ export default function TasksPage() {
             return next;
         });
     }, [tasks]);
-
-    useEffect(() => {
-        if (isProduction) {
-            return;
-        }
-        import("@/lib/store")
-            .then(({ teamMembers }) => {
-                setAssigneeLookup((prev) => {
-                    const next = { ...prev };
-                    teamMembers.forEach((member) => {
-                        next[member.id] = { name: member.name, avatar: member.avatar };
-                    });
-                    return next;
-                });
-                setAssigneeOptions((prev) => {
-                    const memberIds = teamMembers.map((member) => member.id);
-                    return Array.from(new Set([...prev, ...memberIds]));
-                });
-            })
-            .catch(() => {});
-    }, [isProduction]);
 
     const fetchTasks = async () => {
         setIsLoading(true);

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, type ElementType, type ReactNode } from "react";
 import Image from "next/image";
-import type { Idea as BaseIdea, Competitor as BaseCompetitor } from "@/lib/store";
 import { Plus, Trash2, ExternalLink, Lightbulb, Target, X, Edit2, Check, GripVertical, Loader2 } from "lucide-react";
 import {
     DndContext,
@@ -23,14 +22,27 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 // Extend types for MongoDB
-interface Idea extends Omit<BaseIdea, "id"> {
+interface Idea {
     _id: string;
     id?: string;
+    title: string;
+    content: string;
+    category: string;
+    color: string;
+    createdAt: string;
 }
 
-interface Competitor extends Omit<BaseCompetitor, "id"> {
+interface Competitor {
     _id: string;
     id?: string;
+    name: string;
+    logo: string;
+    logoUrl?: string;
+    strengths: string[];
+    weaknesses: string[];
+    url: string;
+    richNotes?: string;
+    images?: string[];
 }
 
 const initialCategories = ["General", "Marketing", "Product", "Sales"];

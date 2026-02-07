@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import dbConnect from "@/lib/db";
 import Activity from "@/models/Activity";
-import { getRecentMemoryActivities } from "@/lib/activity";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +12,6 @@ export async function GET() {
             .limit(5);
         return NextResponse.json(activities);
     } catch {
-        return NextResponse.json(getRecentMemoryActivities(5));
+        return NextResponse.json({ error: "Failed to fetch activities" }, { status: 500 });
     }
 }

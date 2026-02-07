@@ -1,19 +1,32 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { MonthlyExpense as BaseMonthlyExpense, ExpenseCategory, Asset as BaseAsset, AssetCategory } from "@/lib/store";
 import { DollarSign, TrendingUp, Users, Loader2, Pencil } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
-// Extend types to support MongoDB _id
-interface MonthlyExpense extends Omit<BaseMonthlyExpense, "id"> {
+type ExpenseCategory = "Software" | "Utilities" | "Other";
+type AssetCategory = "Production" | "Infrastructure" | "Licenses" | "Electronics" | "Furniture";
+
+interface MonthlyExpense {
     _id: string;
     id?: string;
+    name: string;
+    category: ExpenseCategory;
+    amount: number;
+    status: "Active" | "Paused" | "Cancelled";
+    billingDate?: string;
+    note?: string;
 }
 
-interface Asset extends Omit<BaseAsset, "id"> {
+interface Asset {
     _id: string;
     id?: string;
+    name: string;
+    category: AssetCategory;
+    price: number;
+    status: "للشراء" | "تم الطلب" | "تم الاستلام";
+    owner: string;
+    note?: string;
 }
 
 export default function BudgetPage() {

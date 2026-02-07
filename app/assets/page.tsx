@@ -2,18 +2,24 @@
 
 import { useState, useEffect, Suspense, type ElementType, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
-import type { Asset as BaseAsset, AssetStatus, AssetCategory } from "@/lib/store";
 import { Package, Plus, Trash2, X, FolderOpen, CircuitBoard, FileCheck, Truck, DollarSign, Pencil, Loader2 } from "lucide-react";
 
-// Extend or redefine Asset to support MongoDB _id
-interface Asset extends Omit<BaseAsset, "id"> {
+type AssetStatus = "للشراء" | "تم الطلب" | "تم الاستلام";
+type AssetCategory = "Production" | "Infrastructure" | "Licenses" | "Electronics" | "Furniture";
+
+interface Asset {
     _id: string;
-    id?: string; // Optional for compatibility
+    id?: string;
+    name: string;
+    category: AssetCategory;
+    price: number;
+    status: AssetStatus;
+    owner: string;
+    note?: string;
 }
 
 function AssetsContent() {
     const searchParams = useSearchParams();
-    const isProduction = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
     const [assets, setAssets] = useState<Asset[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -38,20 +44,6 @@ function AssetsContent() {
         const owners = Array.from(new Set(assets.map((asset) => asset.owner).filter(Boolean)));
         setOwnerOptions(owners);
     }, [assets]);
-
-    useEffect(() => {
-        if (isProduction) {
-            return;
-        }
-        import("@/lib/store")
-            .then(({ teamMembers }) => {
-                setOwnerOptions((prev) => {
-                    const names = teamMembers.map((member) => member.name);
-                    return Array.from(new Set([...prev, ...names]));
-                });
-            })
-            .catch(() => {});
-    }, [isProduction]);
 
     const fetchAssets = async () => {
         setIsLoading(true);
