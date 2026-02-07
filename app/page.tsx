@@ -54,21 +54,6 @@ export default function Home() {
   });
 
   useEffect(() => {
-    const storedLaunchDate = localStorage.getItem("launchDate");
-    if (storedLaunchDate) {
-      setLaunchDate(storedLaunchDate);
-    }
-    const storedTotalBudget = localStorage.getItem("totalBudget");
-    if (storedTotalBudget) {
-      const parsedBudget = Number(storedTotalBudget);
-      if (!Number.isNaN(parsedBudget)) {
-        setTotalBudget(parsedBudget);
-        setNewBudgetValue(parsedBudget);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
     const intervalId = setInterval(() => {
       setNow(new Date());
     }, 60 * 60 * 1000);
@@ -78,9 +63,10 @@ export default function Home() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [assetsRes, tasksRes] = await Promise.all([
+        const [assetsRes, tasksRes, settingsRes] = await Promise.all([
           fetch("/api/assets"),
-          fetch("/api/tasks")
+          fetch("/api/tasks"),
+          fetch("/api/settings")
         ]);
 
         if (assetsRes.ok && tasksRes.ok) {
@@ -98,6 +84,14 @@ export default function Home() {
             completedTasks
           });
         }
+        if (settingsRes.ok) {
+          const settings = await settingsRes.json();
+          const nextBudget = Number(settings?.totalBudget ?? 0);
+          const nextLaunchDate = String(settings?.launchDate ?? getTodayDateInput());
+          setTotalBudget(Number.isFinite(nextBudget) ? nextBudget : 0);
+          setNewBudgetValue(Number.isFinite(nextBudget) ? nextBudget : 0);
+          setLaunchDate(nextLaunchDate);
+        }
       } catch (error) {
         console.error("Failed to fetch dashboard data", error);
       } finally {
@@ -110,6 +104,27 @@ export default function Home() {
 
   const budgetRemaining = totalBudget - stats.budgetSpent;
   const daysUntilLaunch = getDaysUntilLaunch(launchDate, now);
+  const updateSettings = async (payload: { totalBudget?: number; launchDate?: string }) => {
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        if (typeof updated?.totalBudget === "number") {
+          setTotalBudget(updated.totalBudget);
+          setNewBudgetValue(updated.totalBudget);
+        }
+        if (typeof updated?.launchDate === "string") {
+          setLaunchDate(updated.launchDate);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to update settings", error);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -172,8 +187,9 @@ export default function Home() {
                   type="date"
                   value={launchDate}
                   onChange={(event) => {
-                    setLaunchDate(event.target.value);
-                    localStorage.setItem("launchDate", event.target.value);
+                    const nextValue = event.target.value;
+                    setLaunchDate(nextValue);
+                    updateSettings({ launchDate: nextValue });
                   }}
                   className="mt-1 w-full max-w-[180px] rounded-md border border-gray-200 px-2 py-1 text-sm text-gray-700"
                 />
@@ -266,8 +282,7 @@ export default function Home() {
               </button>
               <button
                 onClick={() => {
-                  setTotalBudget(newBudgetValue);
-                  localStorage.setItem("totalBudget", String(newBudgetValue));
+                  updateSettings({ totalBudget: newBudgetValue });
                   setIsEditingBudget(false);
                 }}
                 className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"

@@ -43,9 +43,10 @@ export default function BudgetPage() {
         const fetchData = async () => {
             setIsLoading(true);
             try {
-                const [assetsRes, expensesRes] = await Promise.all([
+                const [assetsRes, expensesRes, settingsRes] = await Promise.all([
                     fetch("/api/assets"),
-                    fetch("/api/expenses")
+                    fetch("/api/expenses"),
+                    fetch("/api/settings")
                 ]);
 
                 if (assetsRes.ok && expensesRes.ok) {
@@ -53,6 +54,13 @@ export default function BudgetPage() {
                     const expensesData = await expensesRes.json();
                     setAssets(assetsData);
                     setMonthlyCosts(expensesData);
+                }
+                if (settingsRes.ok) {
+                    const settings = await settingsRes.json();
+                    const revenueValue = Number(settings?.revenuePerStudent ?? 49.99);
+                    const nextRevenue = Number.isFinite(revenueValue) ? revenueValue : 0;
+                    setRevenuePerStudentInput(String(nextRevenue));
+                    setRevenueDraft(String(nextRevenue));
                 }
             } catch (error) {
                 console.error("Failed to fetch budget data", error);
@@ -62,14 +70,6 @@ export default function BudgetPage() {
         };
 
         fetchData();
-    }, []);
-
-    useEffect(() => {
-        const storedRevenue = localStorage.getItem("revenuePerStudent");
-        if (storedRevenue !== null) {
-            setRevenuePerStudentInput(storedRevenue);
-            setRevenueDraft(storedRevenue);
-        }
     }, []);
 
     // Calculations
@@ -122,6 +122,26 @@ export default function BudgetPage() {
                 .reduce((sum, cost) => sum + cost.amount, 0),
         }))
         .filter((entry) => entry.total > 0);
+
+    const updateRevenuePerStudent = async (nextValue: number) => {
+        try {
+            const res = await fetch("/api/settings", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ revenuePerStudent: nextValue }),
+            });
+            if (res.ok) {
+                const updated = await res.json();
+                const updatedValue = Number(updated?.revenuePerStudent ?? nextValue);
+                if (Number.isFinite(updatedValue)) {
+                    setRevenuePerStudentInput(String(updatedValue));
+                    setRevenueDraft(String(updatedValue));
+                }
+            }
+        } catch (error) {
+            console.error("Failed to update revenue", error);
+        }
+    };
 
     const COLORS = ["#10b981", "#06b6d4", "#8b5cf6", "#f59e0b", "#ec4899", "#ef4444", "#3b82f6"];
 
@@ -330,8 +350,10 @@ export default function BudgetPage() {
                                         <button
                                             type="button"
                                             onClick={() => {
-                                                setRevenuePerStudentInput(revenueDraft);
-                                                localStorage.setItem("revenuePerStudent", revenueDraft);
+                                                const parsed = Number(revenueDraft);
+                                                if (Number.isFinite(parsed)) {
+                                                    updateRevenuePerStudent(parsed);
+                                                }
                                                 setIsRevenueEditorOpen(false);
                                             }}
                                             className="rounded-md bg-purple-600 px-3 py-1 text-xs text-white hover:bg-purple-700"

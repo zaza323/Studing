@@ -26,27 +26,16 @@ export default function TasksPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [selectedMember, setSelectedMember] = useState<string>("all");
     const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false);
-    const [assigneeOptions, setAssigneeOptions] = useState<string[]>([]);
-    const [assigneeLookup, setAssigneeLookup] = useState<Record<string, AssigneeInfo>>({});
+    const assigneeOptions = ["مريم الملي", "محمد ظاظا"];
+    const assigneeLookup: Record<string, AssigneeInfo> = {
+        "مريم الملي": { name: "مريم الملي", avatar: "#06b6d4" },
+        "محمد ظاظا": { name: "محمد ظاظا", avatar: "#10b981" },
+    };
 
     // Fetch Tasks
     useEffect(() => {
         fetchTasks();
     }, []);
-
-    useEffect(() => {
-        const uniqueAssignees = Array.from(new Set(tasks.map((task) => task.assignee).filter(Boolean)));
-        setAssigneeOptions(uniqueAssignees);
-        setAssigneeLookup((prev) => {
-            const next = { ...prev };
-            uniqueAssignees.forEach((assignee) => {
-                if (!next[assignee]) {
-                    next[assignee] = { name: assignee };
-                }
-            });
-            return next;
-        });
-    }, [tasks]);
 
     const fetchTasks = async () => {
         setIsLoading(true);
@@ -264,7 +253,9 @@ function TaskCard({
     onUpdateStatus: (taskId: string, newStatus: TaskStatus) => void;
     assigneeLookup: Record<string, AssigneeInfo>;
 }) {
-    const assignee = assigneeLookup[task.assignee];
+    const assignee = task.assignee
+        ? assigneeLookup[task.assignee] ?? { name: task.assignee }
+        : undefined;
     const [showStatusMenu, setShowStatusMenu] = useState(false);
 
     const priorityStyles = {
